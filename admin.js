@@ -3267,32 +3267,26 @@ window.__renderSusiMainLayout = function(grades) {
     const area = document.getElementById('susi-simulation-area');
     if (!area) return;
 
-    // 1. 학생의 현재 성적 데이터를 불러오는 줄
-    const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    
-    // 💡 2. 바로 여기에 콘솔 로그를 추가하세요!
-    console.log("🔍 현재 학생 성적 객체 확인:", score); 
+    // 1. 학생 성적 가져오기
+const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
+const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
 
-    const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
+// 💡 2. 탐구 과목 사탐/과탐/사과탐 판별 로직 (tam1_name, tam2_name 적용)
+const t1 = score.tam1_name || ""; 
+const t2 = score.tam2_name || ""; 
+const isSci = (subj) => /(물리|화학|생명|지구)/.test(subj); // '생명1'은 여기서 과탐으로 걸러집니다.
 
-// 💡 [수정 포인트] 실제 데이터가 들어있는 변수명으로 변경해 주세요!
-// 예: score.tam1_name, score.tam1_subj, score.subject_tam1 등
-const t1 = score.tam1_choice || ""; // <-- 요 부분을 실제 키값으로!
-const t2 = score.tam2_choice || ""; // <-- 요 부분을 실제 키값으로!
-
-const isSci = (subj) => /(물리|화학|생명|지구)/.test(subj); // 과탐 키워드 판별
-
-let tamLabel = "탐"; // 데이터를 못 찾았을 때의 기본값
+let tamLabel = "탐"; // 기본값
 if (t1 && t2) {
     const sci1 = isSci(t1);
     const sci2 = isSci(t2);
     
     if (sci1 && sci2) tamLabel = "과탐";
     else if (!sci1 && !sci2) tamLabel = "사탐";
-    else tamLabel = "사과탐";
+    else tamLabel = "사과탐"; 
 }
 
-// '탐' 대신 판별된 'tamLabel' 변수를 적용
+// 3. 최종 배지 HTML 문자열 생성 (tamLabel 적용)
 const scoreSummaryStr = `실제 응시: <span style="color:#e74c3c; margin-left:4px;">국${grades.kor} 수${mathChoice}${grades.math} 영${grades.eng} 한${grades.hist} ${tamLabel}(${grades.tam1},${grades.tam2})</span>`;
 
     const categories = ['통합 검색', '논술', '의예', '치의예', '한의예', '수의예', '약학', '상위15개대', '과기원', '교대'];
