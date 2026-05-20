@@ -3274,7 +3274,7 @@ const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분'
 // 💡 2. 탐구 과목 사탐/과탐/사과탐 판별 로직 (tam1_name, tam2_name 적용)
 const t1 = score.tam1_name || ""; 
 const t2 = score.tam2_name || ""; 
-const isSci = (subj) => /(물리|화학|생명|지구)/.test(subj); // '생명1'은 여기서 과탐으로 걸러집니다.
+const isSci = (subj) => /(물리|화학|생명|지구|지학)/.test(subj); // '생명1'은 여기서 과탐으로 걸러집니다.
 
 let tamLabel = "탐"; // 기본값
 if (t1 && t2) {
