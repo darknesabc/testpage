@@ -3267,8 +3267,13 @@ window.__renderSusiMainLayout = function(grades) {
     const area = document.getElementById('susi-simulation-area');
     if (!area) return;
 
+    // 1. 학생의 현재 성적 데이터를 불러오는 줄
     const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
-const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
+    
+    // 💡 2. 바로 여기에 콘솔 로그를 추가하세요!
+    console.log("🔍 현재 학생 성적 객체 확인:", score); 
+
+    const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
 
 // 💡 [수정 포인트] 실제 데이터가 들어있는 변수명으로 변경해 주세요!
 // 예: score.tam1_name, score.tam1_subj, score.subject_tam1 등
