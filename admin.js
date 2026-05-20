@@ -3135,10 +3135,10 @@ window.__executeSusiSearch = function(isFromToggle = false) {
     const minInput = document.getElementById('susi-min-gpa');
     const maxInput = document.getElementById('susi-max-gpa');
     
-    if (gpaInput) window.__susiGpaValue = parseFloat(gpaInput.value) || 2.5;
+    if (gpaInput) window.__susiGpaValue = parseFloat(gpaInput.value) || "";
     if (filterSelect) window.__susiGradeFilter = filterSelect.value;
-    if (minInput) window.__susiCustomMin = parseFloat(minInput.value) || 1.0;
-    if (maxInput) window.__susiCustomMax = parseFloat(maxInput.value) || 3.0;
+    if (minInput) window.__susiCustomMin = parseFloat(minInput.value) || "";
+    if (maxInput) window.__susiCustomMax = parseFloat(maxInput.value) || "";
 
     if (isFromToggle === true) return; 
 
