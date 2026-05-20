@@ -3084,7 +3084,7 @@ window.__currentSusiTab = '통합 검색';
 window.__susiMasterData = [];          
 window.__susiFilterSearch = "";        
 window.__susiFilterStream = "전체";      
-window.__susiFilterType = "전체";       
+window.__susiFilterType = "전체";        
 
 window.__susiGradeFilter = "all";
 window.__susiGpaValue = "";
@@ -3093,6 +3093,49 @@ window.__susiCustomMax = "";
 
 window.__susiViewAllMode = false;
 window.__susiViewAllStream = '';
+
+// 👇👇👇 [여기서부터 새로 추가!] 👇👇👇
+window.__susiScoreMode = 'current'; // 수시 기준 성적 모드 (current 또는 avg)
+
+window.__getSusiGrades = function() {
+    const scores = window.__currentStudentScores || [];
+    const currentScore = scores.find(s => s.exam_label === window.__currentSummaryExam) || {};
+
+    if (window.__susiScoreMode === 'current') {
+        return {
+            kor: Number(currentScore.kor_exp_grade) || 9, math: Number(currentScore.math_exp_grade) || 9, eng: Number(currentScore.eng_grade) || 9,
+            tam1: Number(currentScore.tam1_exp_grade) || 9, tam2: Number(currentScore.tam2_exp_grade) || 9, hist: Number(currentScore.extra_grade) || 9
+        };
+    } else {
+        // 누적 평균 모드 (4회 이상 시 최고/최저 제외 후 반올림)
+        const calcAvgGrade = (key) => {
+            const arr = scores.map(s => Number(s[key])).filter(v => !isNaN(v) && v > 0 && v <= 9);
+            const count = arr.length;
+            if (count === 0) return 9;
+            if (count >= 4) {
+                arr.sort((a, b) => a - b);
+                arr.pop();   // 최하 등급(숫자가 가장 큰 것) 제외
+                arr.shift(); // 최고 등급(숫자가 가장 작은 것) 제외
+                const sum = arr.reduce((a, b) => a + b, 0);
+                return Math.round(sum / arr.length);
+            } else {
+                const sum = arr.reduce((a, b) => a + b, 0);
+                return Math.round(sum / count);
+            }
+        };
+        return {
+            kor: calcAvgGrade('kor_exp_grade'), math: calcAvgGrade('math_exp_grade'), eng: calcAvgGrade('eng_grade'),
+            tam1: calcAvgGrade('tam1_exp_grade'), tam2: calcAvgGrade('tam2_exp_grade'), hist: calcAvgGrade('extra_grade')
+        };
+    }
+};
+
+window.__setSusiScoreMode = function(mode) {
+    window.__susiScoreMode = mode;
+    const grades = window.__getSusiGrades();
+    window.__renderSusiMainLayout(grades); 
+};
+// 👆👆👆 [추가 끝] 👆👆👆
 
 // =========================================================
 // 🎯 1. 액션 핸들러 및 상태 동기화
@@ -3112,14 +3155,8 @@ window.__changeSusiTab = function(tabName) {
     window.__susiViewAllMode = false;
     window.__susiViewAllStream = '';
 
-    const scoresArr = window.__currentStudentScores || [];
-    const score = scoresArr.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    const grades = {
-        kor: Number(score.kor_exp_grade) || 9, math: Number(score.math_exp_grade) || 9, eng: Number(score.eng_grade) || 9,
-        tam1: Number(score.tam1_exp_grade) || 9, tam2: Number(score.tam2_exp_grade) || 9, hist: Number(score.extra_grade) || 9
-    };
-    window.__renderSusiMainLayout(grades); 
-};
+    const grades = window.__getSusiGrades();
+    window.__renderSusiMainLayout(grades);
 
 window.__executeSusiSearch = function(isFromToggle = false) {
     const searchInput = document.getElementById('susi-search-input');
@@ -3267,27 +3304,31 @@ window.__renderSusiMainLayout = function(grades) {
     const area = document.getElementById('susi-simulation-area');
     if (!area) return;
 
-    // 1. 학생 성적 가져오기
-const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
-const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
+    const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
+    const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
 
-// 💡 2. 탐구 과목 사탐/과탐/사과탐 판별 로직 (tam1_name, tam2_name 적용)
-const t1 = score.tam1_name || ""; 
-const t2 = score.tam2_name || ""; 
-const isSci = (subj) => /(물리|화학|생명|지구|지학)/.test(subj); // '생명1'은 여기서 과탐으로 걸러집니다.
+    const t1 = score.tam1_name || ""; 
+    const t2 = score.tam2_name || ""; 
+    const isSci = (subj) => /(물리|화학|생명|지구|지학)/.test(subj);
+    let tamLabel = "탐";
+    if (t1 && t2) {
+        const sci1 = isSci(t1); const sci2 = isSci(t2);
+        if (sci1 && sci2) tamLabel = "과탐";
+        else if (!sci1 && !sci2) tamLabel = "사탐";
+        else tamLabel = "사과탐"; 
+    }
 
-let tamLabel = "탐"; // 기본값
-if (t1 && t2) {
-    const sci1 = isSci(t1);
-    const sci2 = isSci(t2);
-    
-    if (sci1 && sci2) tamLabel = "과탐";
-    else if (!sci1 && !sci2) tamLabel = "사탐";
-    else tamLabel = "사과탐"; 
-}
+    // 👇 [추가] 툴팁 및 배지 텍스트 동적 계산
+    const scoresArr = window.__currentStudentScores || [];
+    const kCnt = scoresArr.filter(s => Number(s.kor_exp_grade) > 0).length;
+    const mCnt = scoresArr.filter(s => Number(s.math_exp_grade) > 0).length;
+    const t1Cnt = scoresArr.filter(s => Number(s.tam1_exp_grade) > 0).length;
+    const t2Cnt = scoresArr.filter(s => Number(s.tam2_exp_grade) > 0).length;
+    const tooltipMsg = `국(${kCnt}회) 수(${mCnt}회) 탐1(${t1Cnt}회) 탐2(${t2Cnt}회) 평균등급<br>※ 4회 이상 응시 시 최고/최저 제외 후 반올림`;
 
-// 3. 최종 배지 HTML 문자열 생성 (tamLabel 적용)
-const scoreSummaryStr = `실제 응시: <span style="color:#e74c3c; margin-left:4px;">국${grades.kor} 수${mathChoice}${grades.math} 영${grades.eng} 한${grades.hist} ${tamLabel}(${grades.tam1},${grades.tam2})</span>`;
+    const scoreTitle = window.__susiScoreMode === 'avg' ? '누적 평균(등급)' : '해당 모평(실제)';
+    const scoreSummaryStr = `${scoreTitle}: <span style="color:#e74c3c; margin-left:4px;">국${grades.kor} 수${mathChoice}${grades.math} 영${grades.eng} 한${grades.hist} ${tamLabel}(${grades.tam1},${grades.tam2})</span>`;
+    // 👆 [추가 끝]
 
     const categories = ['통합 검색', '논술', '의예', '치의예', '한의예', '수의예', '약학', '상위15개대', '과기원', '교대'];
     const tabsHtml = categories.map(cat => {
@@ -3324,6 +3365,19 @@ const scoreSummaryStr = `실제 응시: <span style="color:#e74c3c; margin-left:
 
     const controlHtml = `
         <div style="display:flex; align-items:center; flex-wrap:wrap; gap:12px; width:100%; background:#f4f6f7; padding:10px 15px; border-radius:8px; border:1px solid #ecf0f1;">
+            
+            <div style="display:flex; gap:4px; background:#e0e6ed; padding:4px; border-radius:8px; border:1px solid #bdc3c7;">
+                <button onclick="window.__setSusiScoreMode('current')" style="padding:4px 10px; border-radius:6px; border:none; font-size:12px; font-weight:bold; cursor:pointer; transition:0.2s; ${window.__susiScoreMode === 'current' ? 'background:#3498db; color:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.1);' : 'background:transparent; color:#7f8c8d;'}">해당 모평</button>
+                <div style="position:relative; display:inline-block;"
+                     onmouseenter="this.querySelector('.susi-tt').style.opacity=1; this.querySelector('.susi-tt').style.visibility='visible';"
+                     onmouseleave="this.querySelector('.susi-tt').style.opacity=0; this.querySelector('.susi-tt').style.visibility='hidden';">
+                    <button onclick="window.__setSusiScoreMode('avg')" style="padding:4px 10px; border-radius:6px; border:none; font-size:12px; font-weight:bold; cursor:help; transition:0.2s; ${window.__susiScoreMode === 'avg' ? 'background:#3498db; color:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.1); text-decoration:none;' : 'background:transparent; color:#7f8c8d; text-decoration: underline dotted #bdc3c7; text-underline-offset: 3px;'}">누적 평균</button>
+                    <div class="susi-tt" style="visibility:hidden; opacity:0; position:absolute; bottom:120%; left:50%; transform:translateX(-50%); background:rgba(44, 62, 80, 0.95); color:#fff; padding:8px 12px; border-radius:6px; font-size:11px; white-space:nowrap; z-index:100; transition:0.2s; pointer-events:none; box-shadow:0 4px 6px rgba(0,0,0,0.1); line-height:1.5; text-align:center;">
+                        ${tooltipMsg}
+                    </div>
+                </div>
+            </div>
+            <div style="width:1px; height:18px; background:#bdc3c7; margin:0 2px;"></div>
             <div style="display:flex; align-items:center; gap:6px;">
                 <span style="color:#e67e22; font-size:13px; font-weight:bold;">🎯 내 내신:</span>
                 <input type="number" id="susi-my-gpa" value="${window.__susiGpaValue}" step="0.1" style="width:55px; padding:5px; border:1px solid #e67e22; color:#e67e22; border-radius:4px; font-weight:bold; outline:none; text-align:center; font-size:12px;">
