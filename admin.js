@@ -3155,8 +3155,10 @@ window.__changeSusiTab = function(tabName) {
     window.__susiViewAllMode = false;
     window.__susiViewAllStream = '';
 
+    // 💡 [수정 완료] 옛날 코드 삭제 및 닫는 괄호 복구
     const grades = window.__getSusiGrades();
     window.__renderSusiMainLayout(grades);
+}; // 👈 이 닫는 괄호가 빠져있었습니다!
 
 window.__executeSusiSearch = function(isFromToggle = false) {
     const searchInput = document.getElementById('susi-search-input');
@@ -3182,13 +3184,8 @@ window.__executeSusiSearch = function(isFromToggle = false) {
     window.__susiViewAllMode = false;
     window.__susiViewAllStream = '';
     
-    const scoresArr = window.__currentStudentScores || [];
-    const score = scoresArr.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    const grades = {
-        kor: Number(score.kor_exp_grade) || 9, math: Number(score.math_exp_grade) || 9, eng: Number(score.eng_grade) || 9,
-        tam1: Number(score.tam1_exp_grade) || 9, tam2: Number(score.tam2_exp_grade) || 9, hist: Number(score.extra_grade) || 9
-    };
-    
+    // 💡 [수정 완료] 옛날 코드 삭제
+    const grades = window.__getSusiGrades();
     window.__renderSusiMainLayout(grades); 
 };
 
@@ -3203,13 +3200,8 @@ window.__toggleSusiViewAll = function(stream) {
         window.__susiViewAllStream = stream;
     }
     
-    const scoresArr = window.__currentStudentScores || [];
-    const score = scoresArr.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    const grades = {
-        kor: Number(score.kor_exp_grade) || 9, math: Number(score.math_exp_grade) || 9, eng: Number(score.eng_grade) || 9,
-        tam1: Number(score.tam1_exp_grade) || 9, tam2: Number(score.tam2_exp_grade) || 9, hist: Number(score.extra_grade) || 9
-    };
-    
+    // 💡 [수정 완료] 옛날 코드 삭제
+    const grades = window.__getSusiGrades();
     window.__renderSusiMainLayout(grades); 
 };
 
@@ -3270,11 +3262,8 @@ window.__openSusiSimulation = async function() {
 
     area.innerHTML = `<div style="background:#fff; border-radius:12px; border:1px solid #dee2e6; box-shadow:0 6px 12px rgba(0,0,0,0.04); padding:25px; text-align:center; color:#8e44ad; font-weight:bold; font-size:14px;">⏳ 수퍼베이스 수시 마스터 DB를 실시간 동기화하는 중입니다...</div>`;
 
-    const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    const grades = {
-        kor: Number(score.kor_exp_grade) || 9, math: Number(score.math_exp_grade) || 9, eng: Number(score.eng_grade) || 9,
-        tam1: Number(score.tam1_exp_grade) || 9, tam2: Number(score.tam2_exp_grade) || 9, hist: Number(score.extra_grade) || 9
-    };
+    // 💡 [수정 완료] 옛날 코드 삭제 및 단일 함수 호출로 변경
+    const grades = window.__getSusiGrades();
 
     if (!window.__susiMasterData || window.__susiMasterData.length === 0) {
         let allData = []; let fetchMore = true; let startIdx = 0;
