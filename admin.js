@@ -3270,19 +3270,21 @@ window.__renderSusiMainLayout = function(grades) {
     const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
 const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
 
-// 💡 [추가] 탐구 과목 사탐/과탐/사과탐 자동 판별 로직
-const t1 = score.tam1_choice || "";
-const t2 = score.tam2_choice || "";
+// 💡 [수정 포인트] 실제 데이터가 들어있는 변수명으로 변경해 주세요!
+// 예: score.tam1_name, score.tam1_subj, score.subject_tam1 등
+const t1 = score.tam1_choice || ""; // <-- 요 부분을 실제 키값으로!
+const t2 = score.tam2_choice || ""; // <-- 요 부분을 실제 키값으로!
+
 const isSci = (subj) => /(물리|화학|생명|지구)/.test(subj); // 과탐 키워드 판별
 
-let tamLabel = "탐"; // 기본값
+let tamLabel = "탐"; // 데이터를 못 찾았을 때의 기본값
 if (t1 && t2) {
     const sci1 = isSci(t1);
     const sci2 = isSci(t2);
     
     if (sci1 && sci2) tamLabel = "과탐";
     else if (!sci1 && !sci2) tamLabel = "사탐";
-    else tamLabel = "사과탐"; // 하나는 사탐, 하나는 과탐인 경우
+    else tamLabel = "사과탐";
 }
 
 // '탐' 대신 판별된 'tamLabel' 변수를 적용
