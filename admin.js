@@ -3268,8 +3268,25 @@ window.__renderSusiMainLayout = function(grades) {
     if (!area) return;
 
     const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
-    const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
-    const scoreSummaryStr = `실제 응시: <span style="color:#e74c3c; margin-left:4px;">국${grades.kor} 수${mathChoice}${grades.math} 영${grades.eng} 한${grades.hist} 탐(${grades.tam1},${grades.tam2})</span>`;
+const mathChoice = score.math_choice ? `(${score.math_choice.replace('미적분','미적')})` : '';
+
+// 💡 [추가] 탐구 과목 사탐/과탐/사과탐 자동 판별 로직
+const t1 = score.tam1_choice || "";
+const t2 = score.tam2_choice || "";
+const isSci = (subj) => /(물리|화학|생명|지구)/.test(subj); // 과탐 키워드 판별
+
+let tamLabel = "탐"; // 기본값
+if (t1 && t2) {
+    const sci1 = isSci(t1);
+    const sci2 = isSci(t2);
+    
+    if (sci1 && sci2) tamLabel = "과탐";
+    else if (!sci1 && !sci2) tamLabel = "사탐";
+    else tamLabel = "사과탐"; // 하나는 사탐, 하나는 과탐인 경우
+}
+
+// '탐' 대신 판별된 'tamLabel' 변수를 적용
+const scoreSummaryStr = `실제 응시: <span style="color:#e74c3c; margin-left:4px;">국${grades.kor} 수${mathChoice}${grades.math} 영${grades.eng} 한${grades.hist} ${tamLabel}(${grades.tam1},${grades.tam2})</span>`;
 
     const categories = ['통합 검색', '논술', '의예', '치의예', '한의예', '수의예', '약학', '상위15개대', '과기원', '교대'];
     const tabsHtml = categories.map(cat => {
