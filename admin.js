@@ -42,6 +42,28 @@ window.__changeCutoffPercent = function(val) {
 };
 
 // =========================================================
+// 💡 [신규 기능] 타임머신(과거/미래 현황판 조회) 상태 변수
+// =========================================================
+window.__viewDate = null;   // 사용자가 선택한 날짜 (없으면 실제 오늘)
+window.__viewPeriod = null; // 사용자가 선택한 교시 (없으면 실제 현재 교시)
+
+window.__changeViewDate = function(dateStr) {
+    window.__viewDate = dateStr;
+    init(); // 🌟 날짜 변경 시 바둑판 즉시 새로고침
+};
+
+window.__changeViewPeriod = function(period) {
+    window.__viewPeriod = period;
+    init(); // 🌟 교시 변경 시 바둑판 즉시 새로고침
+};
+
+window.__resetViewDate = function() {
+    window.__viewDate = null;
+    window.__viewPeriod = null;
+    init(); // 🌟 현재 시간으로 초기화 후 새로고침
+};
+
+// =========================================================
 // 💡 [신규 기능] 전체(누적) 보기 토글 함수
 // =========================================================
 window.__isCumulativeRadar = false; // 기본값은 '해당 시험만 보기'
@@ -428,14 +450,14 @@ window.__processMoveLogs = function(rawMoveData) {
 // 2. 메인 화면 초기화 (바둑판 카드)
 // =========================================================
 async function init() {
-    // 💡 [추가] 세션 만료 검사 로직 (최상단에 배치)
+    // 💡 세션 만료 검사 로직
     const loginTime = localStorage.getItem('loginTimestamp');
     if (loginTime) {
-        const HOURS_LIMIT = 8; // ⏳ 8시간 지나면 만료
+        const HOURS_LIMIT = 8;
         const LIMIT_MS = HOURS_LIMIT * 60 * 60 * 1000;
         if (Date.now() - parseInt(loginTime, 10) > LIMIT_MS) {
             alert("보안을 위해 로그아웃 되었습니다. 다시 로그인해주세요.");
-            handleLogout(); // 싹 비우고 새로고침
+            handleLogout();
             return;
         }
     }
@@ -453,25 +475,48 @@ async function init() {
     const summary = document.getElementById('status-summary');
 
     try {
+        // 🌟 [타임머신 로직] 실제 시간과 사용자가 선택한 조회 시간을 분리!
         const now = new Date();
-        const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        const realToday = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        const realPeriod = getCurrentPeriod();
+
+        // 사용자가 달력으로 날짜를 안 골랐으면(null) 무조건 실제 오늘로 셋팅
+        const today = window.__viewDate || realToday;
+        const currentP = window.__viewPeriod || realPeriod;
+        
         const isSunday = new Date(today).getDay() === 0; 
-        const currentP = getCurrentPeriod();
 
-        // 💡 [신규] 7일 전 날짜 계산
-        const start7d = new Date(now);
+        // 최근 7일 데이터도 '조회 기준일(today)'을 바탕으로 계산합니다.
+        const viewDateObj = new Date(today + "T00:00:00"); 
+        const start7d = new Date(viewDateObj);
         start7d.setDate(start7d.getDate() - 6);
-        const start7dIso = new Date(start7d.getTime() - (start7d.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
+        const start7dIso = new Date(start7d.getTime() - (start7d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
+        // 🌟 [타임머신 UI 장착] 헤더 부분에 달력과 교시 선택기 추가
         summary.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
-                <div style="font-size:18px; font-weight:bold; color:#2c3e50;">현재 ${currentP}교시 현황판 (${today})</div>
-                <div style="display:flex; gap:5px; background:#eee; padding:4px; border-radius:8px;">
-                <button onclick="window.__changeSort('name')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='name'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">이름순</button>
-                <button onclick="window.__changeSort('seat')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='seat'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">자리순</button>
                 
-                ${(loggedInId === 'admin_4F' || loggedInRole === 'super') ? `<button onclick="window.__changeSort('teacher')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='teacher'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">담임별</button>` : ''}
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="date" value="${today}" onchange="window.__changeViewDate(this.value)" style="padding:6px 10px; border-radius:6px; border:1px solid #bdc3c7; font-weight:bold; color:#2c3e50; font-size:15px; outline:none; cursor:pointer;">
                     
+                    <select onchange="window.__changeViewPeriod(this.value)" style="padding:6px 10px; border-radius:6px; border:1px solid #bdc3c7; font-weight:bold; color:#2c3e50; font-size:15px; outline:none; cursor:pointer;">
+                        ${[1,2,3,4,5,6,7,8].map(p => `<option value="${p}" ${p == currentP ? 'selected' : ''}>${p}교시</option>`).join('')}
+                    </select>
+                    
+                    <span style="font-size:18px; font-weight:bold; color:#2c3e50; margin-left:4px;">현황판</span>
+                    
+                    ${(today !== realToday || String(currentP) !== String(realPeriod)) ? 
+                        `<button onclick="window.__resetViewDate()" style="padding:5px 10px; background:#e74c3c; color:#fff; border:none; border-radius:4px; font-weight:bold; font-size:12px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1); margin-left:8px; transition:0.2s;" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">현재 시간으로 복귀 ↩</button>` 
+                        : ''
+                    }
+                </div>
+
+                <div style="display:flex; gap:5px; background:#eee; padding:4px; border-radius:8px;">
+                    <button onclick="window.__changeSort('name')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='name'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">이름순</button>
+                    <button onclick="window.__changeSort('seat')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='seat'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">자리순</button>
+                    
+                    ${(loggedInId === 'admin_4F' || loggedInRole === 'super') ? `<button onclick="window.__changeSort('teacher')" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; ${window.__currentSortMode==='teacher'?'background:#2c3e50; color:white;':'background:transparent; color:#7f8c8d;'}">담임별</button>` : ''}
+                        
                     <button id="dashboard-fold-btn" onclick="window.__toggleDashboard()" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; background:#7f8c8d; color:white; margin-left:10px;">바둑판 접기 ⬆</button>
                 </div>
             </div>
