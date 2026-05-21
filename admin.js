@@ -2818,6 +2818,7 @@ window.__renderGradeDisplay = function() {
         } else {
         const v = (val) => (val === null || val === undefined || val === "" || val === "0" || val === 0) ? '-' : val;
         
+        // 가장 최근 시험의 데이터를 가져와서 표(Table) 헤더용 과목명 생성
         const latestScore = scores[scores.length - 1] || {};
         const kTitle = latestScore.kor_choice ? `국어(${latestScore.kor_choice.replace('언어와 매체','언매').replace('화법과 작문','화작')})` : '국어';
         const mTitle = latestScore.math_choice ? `수학(${latestScore.math_choice.replace('확률과 통계','확통')})` : '수학';
@@ -2827,8 +2828,9 @@ window.__renderGradeDisplay = function() {
         let h = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
             <style>
-                .grade-trend-table { width:100%; border-collapse:collapse; text-align:center; font-size:13px; color:#2c3e50; min-width:1150px; background:#fff; }
-                .grade-trend-table th, .grade-trend-table td { border:1px solid #ecf0f1; padding:10px 6px; }
+                /* 💡 열이 늘어났으므로 가로 스크롤이 예쁘게 생기도록 min-width를 1350px로 확장 */
+                .grade-trend-table { width:100%; border-collapse:collapse; text-align:center; font-size:13px; color:#2c3e50; min-width:1350px; background:#fff; }
+                .grade-trend-table th, .grade-trend-table td { border:1px solid #ecf0f1; padding:10px 4px; }
                 .grade-trend-table thead th { border-bottom:2px solid #dee2e6; }
                 .grade-trend-table tbody tr:hover { background:#fbfbfc; }
                 .grade-trend-table .g-kor { background:rgba(52, 152, 219, 0.03); }
@@ -2841,17 +2843,17 @@ window.__renderGradeDisplay = function() {
             <table class="grade-trend-table">
                 <thead>
                     <tr style="background:#f8f9fa;">
-                        <th rowspan="2" style="font-weight:bold; color:#34495e; padding:12px;">시험구분</th>
-                        <th colspan="5" style="color:#2980b9;">${kTitle}</th>
-                        <th colspan="5" style="color:#c0392b;">${mTitle}</th>
+                        <th rowspan="2" style="font-weight:bold; color:#34495e; padding:12px; width:75px;">시험구분</th>
+                        <th colspan="7" style="color:#2980b9;">${kTitle}</th>
+                        <th colspan="7" style="color:#c0392b;">${mTitle}</th>
                         <th colspan="2" style="color:#8e44ad;">영어</th>
                         <th colspan="2" style="color:#7f8c8d;">한국사</th>
                         <th colspan="5" style="color:#27ae60;">${t1Title}</th>
                         <th colspan="5" style="color:#d35400;">${t2Title}</th>
                     </tr>
                     <tr style="font-size:11px; color:#7f8c8d; background:#fff;">
-                        <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
-                        <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
+                        <th>과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
+                        <th>과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
                         <th>원점</th><th>등급</th>
                         <th>원점</th><th>등급</th>
                         <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
@@ -2865,12 +2867,11 @@ window.__renderGradeDisplay = function() {
             const stdName = (n) => {
                 if (!n || n === '-' || n === 'null') return '-';
                 let str = String(n).trim();
-                // 💡 [수정] 국어, 수학 선택과목도 깔끔하게 줄임말 처리
                 str = str.replace(/언어와\s*매체|언매/, '언매').replace(/화법과\s*작문|화작/, '화작')
                          .replace(/확률과\s*통계|확통/, '확통').replace(/미적분|미적/, '미적').replace(/기하/, '기하')
                          .replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
                          .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
-                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
+                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법')
                          .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
                          .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
                 return str;
@@ -2879,10 +2880,13 @@ window.__renderGradeDisplay = function() {
             h += `
             <tr>
                 <td style="font-weight:bold; color:#2c3e50;">${s.exam_label}</td>
+                
                 <td class="g-kor" style="font-size:12px;">${stdName(s.kor_choice)}</td>
+                <td class="g-kor" style="color:#7f8c8d;">${v(s.kor_raw_common)}</td><td class="g-kor" style="color:#7f8c8d;">${v(s.kor_raw_choice)}</td>
                 <td class="g-kor">${v(s.kor_raw_total)}</td><td class="g-kor">${v(s.kor_exp_std)}</td><td class="g-kor">${v(s.kor_exp_pct)}</td><td class="g-kor"><b>${v(s.kor_exp_grade)}</b></td>
                 
                 <td class="g-math" style="font-size:12px;">${stdName(s.math_choice)}</td>
+                <td class="g-math" style="color:#7f8c8d;">${v(s.math_raw_common)}</td><td class="g-math" style="color:#7f8c8d;">${v(s.math_raw_choice)}</td>
                 <td class="g-math">${v(s.math_raw_total)}</td><td class="g-math">${v(s.math_exp_std)}</td><td class="g-math">${v(s.math_exp_pct)}</td><td class="g-math"><b>${v(s.math_exp_grade)}</b></td>
                 
                 <td class="g-eng">${v(s.eng_raw)}</td><td class="g-eng"><b>${v(s.eng_grade)}</b></td>
@@ -2910,10 +2914,13 @@ window.__renderGradeDisplay = function() {
             h += `
             <tr style="background:#e8f4f8; font-weight:bold; border-top: 2px solid #bdc3c7;">
                 <td style="color:#2980b9; font-weight:900;">선택 평균 (${scores.length}회)</td>
+                
                 <td class="g-kor" style="color:#bdc3c7;">-</td>
+                <td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_common')}</td><td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_choice')}</td>
                 <td class="g-kor">${calcAvg('kor_raw_total')}</td><td class="g-kor">${calcAvg('kor_exp_std')}</td><td class="g-kor">${calcAvg('kor_exp_pct')}</td><td class="g-kor" style="color:#2980b9;">${calcAvg('kor_exp_grade')}</td>
                 
                 <td class="g-math" style="color:#bdc3c7;">-</td>
+                <td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_common')}</td><td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_choice')}</td>
                 <td class="g-math">${calcAvg('math_raw_total')}</td><td class="g-math">${calcAvg('math_exp_std')}</td><td class="g-math">${calcAvg('math_exp_pct')}</td><td class="g-math" style="color:#c0392b;">${calcAvg('math_exp_grade')}</td>
                 
                 <td class="g-eng">${calcAvg('eng_raw')}</td><td class="g-eng" style="color:#8e44ad;">${calcAvg('eng_grade')}</td>
