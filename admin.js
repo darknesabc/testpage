@@ -2871,7 +2871,7 @@ window.__renderGradeDisplay = function() {
                 let str = String(n).trim();
                 str = str.replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
                          .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
-                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법')
+                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
                          .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
                          .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
                 return str;
