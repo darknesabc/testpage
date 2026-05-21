@@ -1183,13 +1183,12 @@ processedMoveData.forEach(mv => {
 };
 
 // =========================================================
-// 4. 성적 요약 UI
+// 4. 성적 요약 UI (버그 수정 완료)
 // =========================================================
 window.__loadGradeTrend = async function(student) {
     const trendContainer = document.getElementById('grade-trend-container');
     if (!trendContainer) return;
     try {
-        // 💡 [수정] 1,000건 제한 없이 모든 성적 데이터를 불러오는 로직
         let allScores = [];
         let fetchMore = true;
         let startIdx = 0;
@@ -1199,6 +1198,8 @@ window.__loadGradeTrend = async function(student) {
                 .from('mock_scores')
                 .select('*')
                 .order('created_at', { ascending: true })
+                // 🚨 [원인 1 해결] 생성 시간이 똑같은 수천 개의 데이터가 꼬이지 않도록 id 정렬을 반드시 추가!
+                .order('id', { ascending: true }) 
                 .range(startIdx, startIdx + 999);
 
             if (error) throw error;
@@ -1214,7 +1215,12 @@ window.__loadGradeTrend = async function(student) {
         if (allScores.length === 0) return;
 
         window.__allMockScores = allScores;
-        window.__currentStudentScores = allScores.filter(s => s.student_id === student.studentId);
+        
+        // 🚨 [원인 2 해결] 엑셀 업로드 시 섞여 들어간 보이지 않는 공백(" ")을 완벽하게 제거(.trim()) 후 비교
+        window.__currentStudentScores = allScores.filter(s => 
+            String(s.student_id || "").trim() === String(student.studentId || "").trim()
+        );
+        
         window.__currentStudentClass = student.className || ''; 
 
         if (window.__currentStudentScores.length === 0) {
