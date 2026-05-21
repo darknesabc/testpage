@@ -2818,12 +2818,27 @@ window.__renderGradeDisplay = function() {
         } else {
         const v = (val) => (val === null || val === undefined || val === "" || val === "0" || val === 0) ? '-' : val;
         
-        // 가장 최근 시험의 데이터를 가져와서 표(Table) 헤더용 과목명 생성
         const latestScore = scores[scores.length - 1] || {};
-        const kTitle = latestScore.kor_choice ? `국어(${latestScore.kor_choice.replace('언어와 매체','언매').replace('화법과 작문','화작')})` : '국어';
-        const mTitle = latestScore.math_choice ? `수학(${latestScore.math_choice.replace('확률과 통계','확통')})` : '수학';
-        const t1Title = latestScore.tam1_name ? `탐구1(${latestScore.tam1_name})` : '탐구1';
-        const t2Title = latestScore.tam2_name ? `탐구2(${latestScore.tam2_name})` : '탐구2';
+
+        // 💡 [도우미] 과목명 깔끔하게 줄이기 (코드 중복 방지를 위해 위로 배치)
+        const stdName = (n) => {
+            if (!n || n === '-' || n === 'null') return '-';
+            let str = String(n).trim();
+            str = str.replace(/언어와\s*매체|언매/, '언매').replace(/화법과\s*작문|화작/, '화작')
+                     .replace(/확률과\s*통계|확통/, '확통').replace(/미적분|미적/, '미적').replace(/기하/, '기하')
+                     .replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
+                     .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
+                     .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
+                     .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
+                     .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
+            return str;
+        };
+        
+        // 헤더용 과목명 생성
+        const kTitle = latestScore.kor_choice ? `국어(${stdName(latestScore.kor_choice)})` : '국어';
+        const mTitle = latestScore.math_choice ? `수학(${stdName(latestScore.math_choice)})` : '수학';
+        const t1Title = latestScore.tam1_name ? `탐구1(${stdName(latestScore.tam1_name)})` : '탐구1';
+        const t2Title = latestScore.tam2_name ? `탐구2(${stdName(latestScore.tam2_name)})` : '탐구2';
         
         let h = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
@@ -2864,43 +2879,38 @@ window.__renderGradeDisplay = function() {
         `;
 
         scores.forEach(s => {
-            const stdName = (n) => {
-                if (!n || n === '-' || n === 'null') return '-';
-                let str = String(n).trim();
-                str = str.replace(/언어와\s*매체|언매/, '언매').replace(/화법과\s*작문|화작/, '화작')
-                         .replace(/확률과\s*통계|확통/, '확통').replace(/미적분|미적/, '미적').replace(/기하/, '기하')
-                         .replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
-                         .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
-                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
-                         .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
-                         .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
-                return str;
-            };
-
             h += `
             <tr>
                 <td style="font-weight:bold; color:#2c3e50;">${s.exam_label}</td>
                 
-                <td class="g-kor" style="font-size:12px;">${stdName(s.kor_choice)}</td>
+                <td class="g-kor" style="font-size:12px; font-weight:bold;">${stdName(s.kor_choice)}</td>
                 <td class="g-kor" style="color:#7f8c8d;">${v(s.kor_raw_common)}</td><td class="g-kor" style="color:#7f8c8d;">${v(s.kor_raw_choice)}</td>
                 <td class="g-kor">${v(s.kor_raw_total)}</td><td class="g-kor">${v(s.kor_exp_std)}</td><td class="g-kor">${v(s.kor_exp_pct)}</td><td class="g-kor"><b>${v(s.kor_exp_grade)}</b></td>
                 
-                <td class="g-math" style="font-size:12px;">${stdName(s.math_choice)}</td>
+                <td class="g-math" style="font-size:12px; font-weight:bold;">${stdName(s.math_choice)}</td>
                 <td class="g-math" style="color:#7f8c8d;">${v(s.math_raw_common)}</td><td class="g-math" style="color:#7f8c8d;">${v(s.math_raw_choice)}</td>
                 <td class="g-math">${v(s.math_raw_total)}</td><td class="g-math">${v(s.math_exp_std)}</td><td class="g-math">${v(s.math_exp_pct)}</td><td class="g-math"><b>${v(s.math_exp_grade)}</b></td>
                 
                 <td class="g-eng">${v(s.eng_raw)}</td><td class="g-eng"><b>${v(s.eng_grade)}</b></td>
                 <td class="g-hist">${v(s.extra_raw)}</td><td class="g-hist"><b>${v(s.extra_grade)}</b></td>
                 
-                <td class="g-tam1" style="font-size:12px;">${stdName(s.tam1_name)}</td><td class="g-tam1">${v(s.tam1_raw)}</td><td class="g-tam1">${v(s.tam1_exp_std)}</td><td class="g-tam1">${v(s.tam1_exp_pct)}</td><td class="g-tam1"><b>${v(s.tam1_exp_grade)}</b></td>
+                <td class="g-tam1" style="font-size:12px; font-weight:bold;">${stdName(s.tam1_name)}</td><td class="g-tam1">${v(s.tam1_raw)}</td><td class="g-tam1">${v(s.tam1_exp_std)}</td><td class="g-tam1">${v(s.tam1_exp_pct)}</td><td class="g-tam1"><b>${v(s.tam1_exp_grade)}</b></td>
                 
-                <td class="g-tam2" style="font-size:12px;">${stdName(s.tam2_name)}</td><td class="g-tam2">${v(s.tam2_raw)}</td><td class="g-tam2">${v(s.tam2_exp_std)}</td><td class="g-tam2">${v(s.tam2_exp_pct)}</td><td class="g-tam2"><b>${v(s.tam2_exp_grade)}</b></td>
+                <td class="g-tam2" style="font-size:12px; font-weight:bold;">${stdName(s.tam2_name)}</td><td class="g-tam2">${v(s.tam2_raw)}</td><td class="g-tam2">${v(s.tam2_exp_std)}</td><td class="g-tam2">${v(s.tam2_exp_pct)}</td><td class="g-tam2"><b>${v(s.tam2_exp_grade)}</b></td>
             </tr>`;
         });
 
         if (scores.length > 1) { 
-            const calcAvg = (key) => {
-                const validScores = scores.map(s => Number(s[key])).filter(val => !isNaN(val) && val > 0);
+            // 🚨 [핵심 패치] 과목이 일치할 때만 합산하는 필터링 로직 추가!
+            const calcAvg = (key, choiceKey, latestChoice) => {
+                const validScores = scores.filter(s => {
+                    // 과목 필터 키가 들어왔다면 최신 과목명과 일치하는 시험만 남김
+                    if (choiceKey && latestChoice) {
+                        return stdName(s[choiceKey]) === stdName(latestChoice);
+                    }
+                    return true; // 영어나 한국사 등은 필터 패스
+                }).map(s => Number(s[key])).filter(val => !isNaN(val) && val > 0);
+                
                 if (validScores.length === 0) return '-';
                 return (validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length).toFixed(1);
             };
@@ -2916,19 +2926,35 @@ window.__renderGradeDisplay = function() {
                 <td style="color:#2980b9; font-weight:900;">선택 평균 (${scores.length}회)</td>
                 
                 <td class="g-kor" style="color:#bdc3c7;">-</td>
-                <td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_common')}</td><td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_choice')}</td>
-                <td class="g-kor">${calcAvg('kor_raw_total')}</td><td class="g-kor">${calcAvg('kor_exp_std')}</td><td class="g-kor">${calcAvg('kor_exp_pct')}</td><td class="g-kor" style="color:#2980b9;">${calcAvg('kor_exp_grade')}</td>
+                <td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_common', 'kor_choice', latestScore.kor_choice)}</td>
+                <td class="g-kor" style="color:#7f8c8d;">${calcAvg('kor_raw_choice', 'kor_choice', latestScore.kor_choice)}</td>
+                <td class="g-kor">${calcAvg('kor_raw_total', 'kor_choice', latestScore.kor_choice)}</td>
+                <td class="g-kor">${calcAvg('kor_exp_std', 'kor_choice', latestScore.kor_choice)}</td>
+                <td class="g-kor">${calcAvg('kor_exp_pct', 'kor_choice', latestScore.kor_choice)}</td>
+                <td class="g-kor" style="color:#2980b9;">${calcAvg('kor_exp_grade', 'kor_choice', latestScore.kor_choice)}</td>
                 
                 <td class="g-math" style="color:#bdc3c7;">-</td>
-                <td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_common')}</td><td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_choice')}</td>
-                <td class="g-math">${calcAvg('math_raw_total')}</td><td class="g-math">${calcAvg('math_exp_std')}</td><td class="g-math">${calcAvg('math_exp_pct')}</td><td class="g-math" style="color:#c0392b;">${calcAvg('math_exp_grade')}</td>
+                <td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_common', 'math_choice', latestScore.math_choice)}</td>
+                <td class="g-math" style="color:#7f8c8d;">${calcAvg('math_raw_choice', 'math_choice', latestScore.math_choice)}</td>
+                <td class="g-math">${calcAvg('math_raw_total', 'math_choice', latestScore.math_choice)}</td>
+                <td class="g-math">${calcAvg('math_exp_std', 'math_choice', latestScore.math_choice)}</td>
+                <td class="g-math">${calcAvg('math_exp_pct', 'math_choice', latestScore.math_choice)}</td>
+                <td class="g-math" style="color:#c0392b;">${calcAvg('math_exp_grade', 'math_choice', latestScore.math_choice)}</td>
                 
                 <td class="g-eng">${calcAvg('eng_raw')}</td><td class="g-eng" style="color:#8e44ad;">${calcAvg('eng_grade')}</td>
                 <td class="g-hist">${calcAvg('extra_raw')}</td><td class="g-hist" style="color:#7f8c8d;">${calcHistGradeAvg()}</td>
                 
-                <td class="g-tam1" style="color:#bdc3c7;">-</td><td class="g-tam1">${calcAvg('tam1_raw')}</td><td class="g-tam1">${calcAvg('tam1_exp_std')}</td><td class="g-tam1">${calcAvg('tam1_exp_pct')}</td><td class="g-tam1" style="color:#27ae60;">${calcAvg('tam1_exp_grade')}</td>
+                <td class="g-tam1" style="color:#bdc3c7;">-</td>
+                <td class="g-tam1">${calcAvg('tam1_raw', 'tam1_name', latestScore.tam1_name)}</td>
+                <td class="g-tam1">${calcAvg('tam1_exp_std', 'tam1_name', latestScore.tam1_name)}</td>
+                <td class="g-tam1">${calcAvg('tam1_exp_pct', 'tam1_name', latestScore.tam1_name)}</td>
+                <td class="g-tam1" style="color:#27ae60;">${calcAvg('tam1_exp_grade', 'tam1_name', latestScore.tam1_name)}</td>
                 
-                <td class="g-tam2" style="color:#bdc3c7;">-</td><td class="g-tam2">${calcAvg('tam2_raw')}</td><td class="g-tam2">${calcAvg('tam2_exp_std')}</td><td class="g-tam2">${calcAvg('tam2_exp_pct')}</td><td class="g-tam2" style="color:#d35400;">${calcAvg('tam2_exp_grade')}</td>
+                <td class="g-tam2" style="color:#bdc3c7;">-</td>
+                <td class="g-tam2">${calcAvg('tam2_raw', 'tam2_name', latestScore.tam2_name)}</td>
+                <td class="g-tam2">${calcAvg('tam2_exp_std', 'tam2_name', latestScore.tam2_name)}</td>
+                <td class="g-tam2">${calcAvg('tam2_exp_pct', 'tam2_name', latestScore.tam2_name)}</td>
+                <td class="g-tam2" style="color:#d35400;">${calcAvg('tam2_exp_grade', 'tam2_name', latestScore.tam2_name)}</td>
             </tr>`;
         }
 
