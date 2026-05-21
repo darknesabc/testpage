@@ -2852,8 +2852,8 @@ window.__renderGradeDisplay = function() {
                         <th colspan="5" style="color:#d35400;">${t2Title}</th>
                     </tr>
                     <tr style="font-size:11px; color:#7f8c8d; background:#fff;">
-                        <th>과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
-                        <th>과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
+                        <th>선택과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
+                        <th>선택과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
                         <th>원점</th><th>등급</th>
                         <th>원점</th><th>등급</th>
                         <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
@@ -2871,7 +2871,7 @@ window.__renderGradeDisplay = function() {
                          .replace(/확률과\s*통계|확통/, '확통').replace(/미적분|미적/, '미적').replace(/기하/, '기하')
                          .replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
                          .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
-                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법')
+                         .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
                          .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
                          .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
                 return str;
