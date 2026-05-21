@@ -2815,8 +2815,6 @@ window.__renderGradeDisplay = function() {
                 } 
             } 
         });
-
-    } else {
         } else {
         const v = (val) => (val === null || val === undefined || val === "" || val === "0" || val === 0) ? '-' : val;
         
