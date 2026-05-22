@@ -2609,6 +2609,26 @@ if (myMathTotal > 0 && myMathChoice) {
     mathChoiceRank = mathChoiceScores.indexOf(myMathTotal) + 1;
 }
 
+    // 3. 탐구 1 등수 (동일 과목 응시자 기준)
+const myTam1Name = currentStudentScore.tam1_name;
+const myTam1Raw = Number(currentStudentScore.tam1_raw) || 0;
+let tam1Rank = '-', tam1Count = 0;
+if (myTam1Raw > 0 && myTam1Name) {
+    const tam1Scores = allTargetExamScores.filter(s => s.tam1_name === myTam1Name).map(s => Number(s.tam1_raw)).filter(v => v > 0).sort((a, b) => b - a);
+    tam1Count = tam1Scores.length;
+    tam1Rank = tam1Scores.indexOf(myTam1Raw) + 1;
+}
+
+// 4. 탐구 2 등수 (동일 과목 응시자 기준)
+const myTam2Name = currentStudentScore.tam2_name;
+const myTam2Raw = Number(currentStudentScore.tam2_raw) || 0;
+let tam2Rank = '-', tam2Count = 0;
+if (myTam2Raw > 0 && myTam2Name) {
+    const tam2Scores = allTargetExamScores.filter(s => s.tam2_name === myTam2Name).map(s => Number(s.tam2_raw)).filter(v => v > 0).sort((a, b) => b - a);
+    tam2Count = tam2Scores.length;
+    tam2Rank = tam2Scores.indexOf(myTam2Raw) + 1;
+}
+
     container.innerHTML = `
         <div style="background:#fff; padding:25px; border-radius:12px; border:1px solid #dee2e6; box-shadow:0 4px 6px rgba(0,0,0,0.02); margin-top:20px;">
             <div style="margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #f1f2f6;">
@@ -2643,7 +2663,7 @@ if (myMathTotal > 0 && myMathChoice) {
 
                 <div style="margin-left:auto; position:relative;" onmouseenter="document.getElementById('hidden-rank-menu').style.display='block';" onmouseleave="document.getElementById('hidden-rank-menu').style.display='none';">
                     <div style="cursor:pointer; padding:6px 15px; background:#fdfdfd; border:1px solid #dee2e6; border-radius:6px; font-size:12px; font-weight:bold; color:#34495e; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);" onmouseover="this.style.background='#f1f2f6'; this.style.borderColor='#bdc3c7';" onmouseout="this.style.background='#fdfdfd'; this.style.borderColor='#dee2e6';">
-                        🏆 국어 등수 확인
+                        🏆 등수 확인
                     </div>
                     
                    
@@ -2667,8 +2687,17 @@ if (myMathTotal > 0 && myMathChoice) {
     <div style="display:flex; justify-content:space-between;">
         <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
     </div>
+    <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px;">탐구</div>
+<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+    <span style="font-size:11px;">${myTam1Name || '탐구1'}</span> 
+    <span style="color:#27ae60; font-weight:900;">${tam1Rank} / ${tam1Count}명</span>
 </div>
-                </div>
+<div style="display:flex; justify-content:space-between;">
+    <span style="font-size:11px;">${myTam2Name || '탐구2'}</span> 
+    <span style="color:#f39c12; font-weight:900;">${tam2Rank} / ${tam2Count}명</span>
+</div>
+</div>
+</div>
                 </div>
 
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px; ${window.__currentViewMode==='table' ? 'display:none;' : ''}">
