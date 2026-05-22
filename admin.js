@@ -2646,7 +2646,7 @@ if (myMathTotal > 0 && myMathChoice) {
                         🏆 국어 등수 확인
                     </div>
                     
-                    // 💡 히든 메뉴 UI 부분
+                   
 <div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:230px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
     <div style="font-size:11px; color:#95a5a6; margin-bottom:12px; font-weight:bold; border-bottom:1px dashed #ecf0f1; padding-bottom:6px;">
         📊 기준 시험: <span style="color:#2c3e50;">${targetExam || '-'}</span>
