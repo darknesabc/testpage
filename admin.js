@@ -2535,7 +2535,7 @@ window.__renderRadarChartCanvas = function() {
 };
 
 // =========================================================
-// 💡 추이 & 그래프 로직 (UI 렌더링 - '우리반 30%' 버튼 제거)
+// 💡 추이 & 그래프 로직 (UI 렌더링 - 히든 등수 메뉴 추가)
 // =========================================================
 window.__renderGradeTrendUI = function() {
     const container = document.getElementById('grade-trend-container');
@@ -2550,7 +2550,6 @@ window.__renderGradeTrendUI = function() {
         return `<button onclick="window.__toggleExamType('${key}')" style="border:1px solid ${isOn ? colors[key] : '#dee2e6'}; padding:6px 15px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:bold; background:${isOn ? colors[key] : '#fff'}; color:${isOn ? '#fff' : '#bdc3c7'}; transition:0.2s; margin-right:5px;">${isOn ? '✅' : '⬜'} ${key}</button>`;
     };
 
-    // 💡 [수정] 30% 고정이 아닌 동적 퍼센트를 보여주도록 수정
     const tglBtn = (key, label) => {
         const isOn = window.__toggles[key];
         const displayLabel = label.replace('30%', window.__cutoffPercent + '%');
@@ -2569,6 +2568,32 @@ window.__renderGradeTrendUI = function() {
         return `<button onclick="window.__toggleSubject('${id}')" style="background:${isOn ? color : '#f1f2f6'}; color:${isOn ? '#fff' : '#bdc3c7'}; border:1px solid ${isOn ? color : '#dee2e6'}; padding:4px 12px; border-radius:15px; font-size:11px; font-weight:bold; cursor:pointer; transition:0.2s;">${label}</button>`;
     };
 
+    // 💡 [신규 로직] 선택된 시험 기준 국어 등수 자동 계산
+    const targetExam = window.__currentSummaryExam; // 현재 요약/조회 중인 시험 기준
+    const currentStudentScore = window.__currentStudentScores.find(s => s.exam_label === targetExam) || {};
+    const allTargetExamScores = window.__allMockScores.filter(s => s.exam_label === targetExam);
+
+    // 1. 국어 전체 등수
+    const myKorTotal = Number(currentStudentScore.kor_raw_total) || 0;
+    let korTotalRank = '-';
+    let korTotalCount = 0;
+    if (myKorTotal > 0) {
+        // 동점자 처리를 위해 내림차순 정렬 후 indexOf로 순위 산정 (공동 1등 처리 완벽 지원)
+        const korScores = allTargetExamScores.map(s => Number(s.kor_raw_total)).filter(v => v > 0).sort((a, b) => b - a);
+        korTotalCount = korScores.length;
+        korTotalRank = korScores.indexOf(myKorTotal) + 1;
+    }
+
+    // 2. 국어(선택과목) 등수
+    const myKorChoice = currentStudentScore.kor_choice;
+    let korChoiceRank = '-';
+    let korChoiceCount = 0;
+    if (myKorTotal > 0 && myKorChoice) {
+        const korChoiceScores = allTargetExamScores.filter(s => s.kor_choice === myKorChoice).map(s => Number(s.kor_raw_total)).filter(v => v > 0).sort((a, b) => b - a);
+        korChoiceCount = korChoiceScores.length;
+        korChoiceRank = korChoiceScores.indexOf(myKorTotal) + 1;
+    }
+
     container.innerHTML = `
         <div style="background:#fff; padding:25px; border-radius:12px; border:1px solid #dee2e6; box-shadow:0 4px 6px rgba(0,0,0,0.02); margin-top:20px;">
             <div style="margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #f1f2f6;">
@@ -2581,7 +2606,7 @@ window.__renderGradeTrendUI = function() {
                 </div>
             </div>
 
-            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:15px;">
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:15px; position:relative;">
                 <h4 style="margin:0; color:#2c3e50;">📈 성적 추이</h4>
                 
                 <div style="display:flex; gap:5px; background:#f1f2f6; padding:3px; border-radius:6px;">
@@ -2600,7 +2625,27 @@ window.__renderGradeTrendUI = function() {
                         <input type="number" value="${window.__cutoffPercent}" min="1" max="100" step="1" onchange="window.__changeCutoffPercent(this.value)" style="width:40px; border:none; border-bottom:2px solid #3498db; background:transparent; text-align:center; font-weight:900; font-size:14px; color:#2980b9; outline:none; margin:0 3px;"> %
                     </span>
                 </div>
-            </div>
+
+                <div style="margin-left:auto; position:relative;" onmouseenter="document.getElementById('hidden-rank-menu').style.display='block';" onmouseleave="document.getElementById('hidden-rank-menu').style.display='none';">
+                    <div style="cursor:pointer; padding:6px 15px; background:#fdfdfd; border:1px solid #dee2e6; border-radius:6px; font-size:12px; font-weight:bold; color:#34495e; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);" onmouseover="this.style.background='#f1f2f6'; this.style.borderColor='#bdc3c7';" onmouseout="this.style.background='#fdfdfd'; this.style.borderColor='#dee2e6';">
+                        🏆 국어 등수 확인
+                    </div>
+                    
+                    <div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:230px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
+                        <div style="font-size:11px; color:#95a5a6; margin-bottom:12px; font-weight:bold; border-bottom:1px dashed #ecf0f1; padding-bottom:6px;">
+                            📊 기준 시험: <span style="color:#2c3e50;">${targetExam || '-'}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <span style="font-size:13px; color:#2c3e50; font-weight:bold;">국어 전체 등수</span>
+                            <span style="font-size:15px; color:#3498db; font-weight:900;">${korTotalRank}<span style="font-size:11px; color:#7f8c8d; font-weight:normal;"> / ${korTotalCount}명</span></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:13px; color:#2c3e50; font-weight:bold;">국어(<span style="color:#e74c3c;">${myKorChoice || '선택'}</span>) 등수</span>
+                            <span style="font-size:15px; color:#e74c3c; font-weight:900;">${korChoiceRank}<span style="font-size:11px; color:#7f8c8d; font-weight:normal;"> / ${korChoiceCount}명</span></span>
+                        </div>
+                    </div>
+                </div>
+                </div>
 
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px; ${window.__currentViewMode==='table' ? 'display:none;' : ''}">
                 ${tglBtn('topTotal', '전체 상위 30%')}
