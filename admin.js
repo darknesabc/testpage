@@ -1848,12 +1848,16 @@ window.__changeSummaryExam = function(examLabel) {
         window.__loadGradeErrata(examLabel);
     }
 
-    // 4. 🌟 [강력 추가] 정시 시뮬레이션 보드 자동 동기화
-    // 만약 시뮬레이션 보드가 화면에 열려있는 상태라면? -> 바뀐 점수로 즉시 자동 재계산!
+    // 4. 정시 시뮬레이션 보드 자동 동기화
     const simArea = document.getElementById('univ-simulation-area');
     if (simArea && simArea.style.display === 'block') {
         simArea.style.display = 'none'; // 잠깐 숨겼다가
         window.__openUnivSimulation();  // 새로운 점수로 시뮬레이터 즉시 재가동!
+    }
+
+    // 💡 5. [핵심 추가] 상단 요약 시험을 변경하면, 추이 그래프 쪽의 "히든 등수 메뉴"도 즉시 동기화되도록 UI 새로고침!
+    if (typeof window.__renderGradeTrendUI === 'function') {
+        window.__renderGradeTrendUI();
     }
 };
 
