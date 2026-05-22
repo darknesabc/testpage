@@ -2668,6 +2668,8 @@ if (myMathTotal > 0 && myMathChoice) {
         <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
     </div>
 </div>
+                </div>
+                </div>
 
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px; ${window.__currentViewMode==='table' ? 'display:none;' : ''}">
                 ${tglBtn('topTotal', '전체 상위 30%')}
