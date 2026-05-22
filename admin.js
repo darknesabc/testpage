@@ -2535,7 +2535,7 @@ window.__renderRadarChartCanvas = function() {
 };
 
 // =========================================================
-// 💡 추이 & 그래프 로직 (UI 렌더링 - '우리반 30%' 버튼 제거)
+// 💡 추이 & 그래프 로직 (UI 렌더링 - 🏆 상세 등수 보기 버튼 추가)
 // =========================================================
 window.__renderGradeTrendUI = function() {
     const container = document.getElementById('grade-trend-container');
@@ -2543,14 +2543,12 @@ window.__renderGradeTrendUI = function() {
 
     const btnSty = (isActive, bg, fg) => `border:1px solid #dee2e6; padding:5px 12px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; background:${isActive ? bg : 'transparent'}; color:${isActive ? '#fff' : fg}; transition:0.2s;`;
     
-    // 시험 종류 토글 버튼 스타일
     const examTglBtn = (key) => {
         const isOn = window.__examTypeToggles[key];
         const colors = { '더프': '#34495e', '오메가': '#e67e22', '전대실모': '#27ae60', '평가원': '#2980b9' };
         return `<button onclick="window.__toggleExamType('${key}')" style="border:1px solid ${isOn ? colors[key] : '#dee2e6'}; padding:6px 15px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:bold; background:${isOn ? colors[key] : '#fff'}; color:${isOn ? '#fff' : '#bdc3c7'}; transition:0.2s; margin-right:5px;">${isOn ? '✅' : '⬜'} ${key}</button>`;
     };
 
-    // 💡 [수정] 30% 고정이 아닌 동적 퍼센트를 보여주도록 수정
     const tglBtn = (key, label) => {
         const isOn = window.__toggles[key];
         const displayLabel = label.replace('30%', window.__cutoffPercent + '%');
@@ -2563,7 +2561,6 @@ window.__renderGradeTrendUI = function() {
     const t1Label = latestScore.tam1_name ? `탐구1(${latestScore.tam1_name})` : '탐구1';
     const t2Label = latestScore.tam2_name ? `탐구2(${latestScore.tam2_name})` : '탐구2';
 
-    // 과목 켜기/끄기 버튼
     const subjBtn = (id, label, color) => {
         const isOn = window.__subjectToggles[id];
         return `<button onclick="window.__toggleSubject('${id}')" style="background:${isOn ? color : '#f1f2f6'}; color:${isOn ? '#fff' : '#bdc3c7'}; border:1px solid ${isOn ? color : '#dee2e6'}; padding:4px 12px; border-radius:15px; font-size:11px; font-weight:bold; cursor:pointer; transition:0.2s;">${label}</button>`;
@@ -2600,6 +2597,12 @@ window.__renderGradeTrendUI = function() {
                         <input type="number" value="${window.__cutoffPercent}" min="1" max="100" step="1" onchange="window.__changeCutoffPercent(this.value)" style="width:40px; border:none; border-bottom:2px solid #3498db; background:transparent; text-align:center; font-weight:900; font-size:14px; color:#2980b9; outline:none; margin:0 3px;"> %
                     </span>
                 </div>
+
+                <button onclick="const el = document.getElementById('rank-hidden-panel'); el.style.display = el.style.display === 'none' ? 'block' : 'none';" style="margin-left:auto; background:#34495e; color:#fff; border:none; padding:6px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:12px; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:0.2s;" onmouseover="this.style.background='#2c3e50'" onmouseout="this.style.background='#34495e'">🏆 상세 등수 확인 ▼</button>
+            </div>
+
+            <div id="rank-hidden-panel" style="display:none; margin-bottom:15px; background:#f8f9fa; border:2px solid #2c3e50; border-radius:8px; padding:15px; box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+                <div id="rank-hidden-content" style="text-align:center; color:#7f8c8d; font-size:13px; font-weight:bold;">데이터를 계산 중입니다...</div>
             </div>
 
             <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px; ${window.__currentViewMode==='table' ? 'display:none;' : ''}">
@@ -2629,28 +2632,9 @@ window.__renderGradeTrendUI = function() {
     }, 50);
 };
 
-// 시험 타입 토글 함수
-window.__toggleExamType = function(type) {
-    window.__examTypeToggles[type] = !window.__examTypeToggles[type];
-    window.__renderGradeTrendUI(); 
-};
-
-// 30% 컷 라인 토글 함수
-window.__toggleCutoff = function(key) { 
-    window.__toggles[key] = !window.__toggles[key]; 
-    window.__renderGradeTrendUI(); 
-};
-
-// 과목 토글 함수
-window.__toggleSubject = function(subjId) { 
-    window.__subjectToggles[subjId] = !window.__subjectToggles[subjId]; 
-    window.__renderGradeTrendUI(); 
-};
-
 window.__renderGradeDisplay = function() {
     const area = document.getElementById('grade-display-area');
     
-    // 1. 선택된 시험 종류(더프, 오메가 등)만 필터링
     const scores = window.__currentStudentScores.filter(s => {
         const type = getExamType(s.exam_label);
         return window.__examTypeToggles[type] === true;
@@ -2671,7 +2655,6 @@ window.__renderGradeDisplay = function() {
         return s[`${subj}_raw_total`] !== undefined ? (s[`${subj}_raw_total`] ? Number(s[`${subj}_raw_total`]) : null) : (s[`${subj}_raw`] ? Number(s[`${subj}_raw`]) : null);
     };
 
-    // 💡 [수정] getTop30 -> getTopN 으로 변경하고 사용자가 입력한 % 반영
     const getTopN = (examLabel, subj, valKey, filterMode, myScore) => {
         let pool = window.__allMockScores.filter(s => s.exam_label === examLabel);
         if (filterMode === 'topClass') pool = pool.filter(s => s.class_name === window.__currentStudentClass);
@@ -2707,13 +2690,116 @@ window.__renderGradeDisplay = function() {
         
         if (vals.length === 0) return null;
 
-        // 💡 핵심 교정 부분: 0.3 이었던 부분을 동적으로 계산
         let ratio = window.__cutoffPercent / 100;
         let idx = Math.floor(vals.length * ratio);
         if (idx >= vals.length) idx = vals.length - 1;
         return vals[idx];
     };
 
+    // 💡 [신규 추가] 표/그래프 렌더링 직전에 '최신 시험' 기준으로 등수 계산기 가동
+    const latestScore = scores[scores.length - 1] || {};
+    const rankContent = document.getElementById('rank-hidden-content');
+    
+    if (rankContent && latestScore.exam_label) {
+        const exLabel = latestScore.exam_label;
+        const allScoresForEx = window.__allMockScores.filter(s => s.exam_label === exLabel);
+        const myClass = latestScore.class_name;
+        
+        // 💡 등수 계산기: 모수(응시자) 중에 내 점수보다 높은 사람의 수 + 1 (결시자 제외)
+        const getRank = (pool, myRaw, valFn) => {
+            const m = Number(myRaw);
+            if (isNaN(m) || m === 0 || !myRaw) return { r: '-', t: '-' };
+            
+            const validPool = pool.filter(s => {
+                const v = valFn(s);
+                return !isNaN(v) && v > 0;
+            });
+            const rank = validPool.filter(s => valFn(s) > m).length + 1;
+            return { r: rank, t: validPool.length };
+        };
+
+        // 💡 탐구 등수 계산기: 선택과목이 탐1에 있든 탐2에 있든 싹 다 모아서 등수 계산
+        const getTamRank = (tamName, myRaw) => {
+            if (!tamName || !myRaw || tamName === '-' || Number(myRaw) === 0) return { r: '-', t: '-' };
+            const m = Number(myRaw);
+            let poolVals = [];
+            allScoresForEx.forEach(s => {
+                if (s.tam1_name === tamName && Number(s.tam1_raw) > 0) poolVals.push(Number(s.tam1_raw));
+                if (s.tam2_name === tamName && Number(s.tam2_raw) > 0) poolVals.push(Number(s.tam2_raw));
+            });
+            const rank = poolVals.filter(v => v > m).length + 1;
+            return { r: rank, t: poolVals.length };
+        };
+
+        // 💡 국수탐 평균 백분위 계산기 (소수점 1자리)
+        const calcKmtPct = (s) => {
+            const k = Number(s.kor_exp_pct || 0);
+            const m = Number(s.math_exp_pct || 0);
+            const t1 = Number(s.tam1_exp_pct || 0);
+            const t2 = Number(s.tam2_exp_pct || 0);
+            let tCnt = 0; if (t1>0) tCnt++; if (t2>0) tCnt++;
+            const tAvg = tCnt > 0 ? (t1 + t2) / tCnt : 0;
+            return Math.round((k + m + tAvg) * 10) / 10;
+        };
+
+        // 1. 국어 계산
+        const rKorTot = getRank(allScoresForEx, latestScore.kor_raw_total, s => Number(s.kor_raw_total));
+        const poolKorCh = allScoresForEx.filter(s => s.kor_choice === latestScore.kor_choice);
+        const rKorCh = getRank(poolKorCh, latestScore.kor_raw_total, s => Number(s.kor_raw_total));
+
+        // 2. 수학 계산
+        const rMathTot = getRank(allScoresForEx, latestScore.math_raw_total, s => Number(s.math_raw_total));
+        const poolMathCh = allScoresForEx.filter(s => s.math_choice === latestScore.math_choice);
+        const rMathCh = getRank(poolMathCh, latestScore.math_raw_total, s => Number(s.math_raw_total));
+
+        // 3. 탐구 계산
+        const rTam1 = getTamRank(latestScore.tam1_name, latestScore.tam1_raw);
+        const rTam2 = getTamRank(latestScore.tam2_name, latestScore.tam2_raw);
+
+        // 4. 국수탐 평백 전체/반 계산
+        const myKmt = calcKmtPct(latestScore);
+        const rKmtTot = getRank(allScoresForEx, myKmt, calcKmtPct);
+        const poolClass = allScoresForEx.filter(s => s.class_name === myClass);
+        const rKmtClass = getRank(poolClass, myKmt, calcKmtPct);
+
+        const stdName = (n) => {
+            if (!n || n === '-' || n === 'null') return '-';
+            let str = String(n).trim();
+            str = str.replace(/언어와\s*매체|언매/, '언매').replace(/화법과\s*작문|화작/, '화작')
+                     .replace(/확률과\s*통계|확통/, '확통').replace(/미적분|미적/, '미적').replace(/기하/, '기하')
+                     .replace(/생활과윤리|생윤/, '생윤').replace(/사회문화|사문/, '사문')
+                     .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
+                     .replace(/동아시아사|동사/, '동사').replace(/정치와법|정법/, '정법')
+                     .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
+                     .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
+            return str;
+        };
+
+        const mkCard = (title, rData, color) => `
+            <div style="background:#fff; border:1px solid #ecf0f1; border-radius:6px; padding:10px 5px; text-align:center; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                <div style="font-size:11px; color:#7f8c8d; font-weight:bold; margin-bottom:4px; letter-spacing:-0.5px;">${title}</div>
+                <div style="font-size:16px; font-weight:900; color:${color};">${rData.r}<span style="font-size:11px; font-weight:normal; color:#bdc3c7;"> / ${rData.t}등</span></div>
+            </div>
+        `;
+
+        rankContent.innerHTML = `
+            <div style="font-size:13px; font-weight:bold; color:#2c3e50; margin-bottom:12px; text-align:left; border-bottom:1px dashed #bdc3c7; padding-bottom:8px;">
+                📌 가장 최근 선택된 <span style="color:#e74c3c;">[${exLabel}]</span> 기준 상세 등수 (결시자 제외)
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+                ${mkCard('국어 (전체)', rKorTot, '#3498db')}
+                ${latestScore.kor_choice ? mkCard(`국어 (${stdName(latestScore.kor_choice)})`, rKorCh, '#2980b9') : ''}
+                ${mkCard('수학 (전체)', rMathTot, '#e74c3c')}
+                ${latestScore.math_choice ? mkCard(`수학 (${stdName(latestScore.math_choice)})`, rMathCh, '#c0392b') : ''}
+                ${latestScore.tam1_name ? mkCard(`탐구1 (${stdName(latestScore.tam1_name)})`, rTam1, '#27ae60') : ''}
+                ${latestScore.tam2_name ? mkCard(`탐구2 (${stdName(latestScore.tam2_name)})`, rTam2, '#f39c12') : ''}
+                ${mkCard('국수탐 평백 (전체)', rKmtTot, '#8e44ad')}
+                ${mkCard(`국수탐 평백 (${myClass}반)`, rKmtClass, '#9b59b6')}
+            </div>
+        `;
+    }
+
+    // 💡 [그래프 및 표 렌더링 시작]
     if (view === 'graph') {
         area.innerHTML = '<canvas id="gradeChart"></canvas>';
         const ctx = document.getElementById('gradeChart').getContext('2d');
@@ -2730,7 +2816,6 @@ window.__renderGradeDisplay = function() {
             let valKey = (sbj.id === 'eng') ? (mode === 'pct' ? 'eng_grade' : 'eng_raw') : (mode === 'pct' ? `${sbj.id}_exp_pct` : (sbj.id.startsWith('tam') ? `${sbj.id}_raw` : `${sbj.id}_raw_total`));
             const yAxisID = (sbj.id === 'eng' && mode === 'pct') ? 'yGrade' : 'y';
             
-            // 학생 본인 성적 (실선)
             datasets.push({ 
                 label: sbj.name, 
                 data: scores.map(s => getVal(s, sbj.id)), 
@@ -2743,12 +2828,10 @@ window.__renderGradeDisplay = function() {
                 yAxisID: yAxisID 
             });
 
-            // 💡 [핵심 교정] "if (sbj.id !== 'eng')" 차단막 삭제! 이제 영어도 30% 선을 그립니다.
             const addLine = (key, label, dashPattern, color) => {
                 if (window.__toggles[key]) {
                     datasets.push({ 
                         label: `${sbj.name} (${label})`, 
-                        // 💡 여기서 getTop30 -> getTopN 으로 변경
                         data: scores.map(s => getTopN(s.exam_label, sbj.id, valKey, key, s)), 
                         borderColor: color || colors[sbj.id], 
                         borderDash: dashPattern, 
@@ -2761,7 +2844,7 @@ window.__renderGradeDisplay = function() {
                 }
             };
 
-            const pct = window.__cutoffPercent; // 현재 설정된 퍼센트
+            const pct = window.__cutoffPercent; 
             addLine('topTotal', `전체상위${pct}%`, [5, 5], colors[sbj.id]);
             addLine('topChoice', `선택상위${pct}%`, [3, 3], '#9b59b6'); 
             addLine('topClass', `우리반${pct}%`, [2, 2], '#1abc9c');
@@ -2815,12 +2898,10 @@ window.__renderGradeDisplay = function() {
                 } 
             } 
         });
-        } else {
+
+    } else {
         const v = (val) => (val === null || val === undefined || val === "" || val === "0" || val === 0) ? '-' : val;
         
-        const latestScore = scores[scores.length - 1] || {};
-
-        // 💡 [도우미] 과목명 깔끔하게 줄이기 (코드 중복 방지를 위해 위로 배치)
         const stdName = (n) => {
             if (!n || n === '-' || n === 'null') return '-';
             let str = String(n).trim();
@@ -2834,7 +2915,6 @@ window.__renderGradeDisplay = function() {
             return str;
         };
         
-        // 헤더용 과목명 생성
         const kTitle = latestScore.kor_choice ? `국어(${stdName(latestScore.kor_choice)})` : '국어';
         const mTitle = latestScore.math_choice ? `수학(${stdName(latestScore.math_choice)})` : '수학';
         const t1Title = latestScore.tam1_name ? `탐구1(${stdName(latestScore.tam1_name)})` : '탐구1';
@@ -2843,7 +2923,6 @@ window.__renderGradeDisplay = function() {
         let h = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
             <style>
-                /* 💡 열이 늘어났으므로 가로 스크롤이 예쁘게 생기도록 min-width를 1350px로 확장 */
                 .grade-trend-table { width:100%; border-collapse:collapse; text-align:center; font-size:13px; color:#2c3e50; min-width:1350px; background:#fff; }
                 .grade-trend-table th, .grade-trend-table td { border:1px solid #ecf0f1; padding:10px 4px; }
                 .grade-trend-table thead th { border-bottom:2px solid #dee2e6; }
@@ -2901,14 +2980,12 @@ window.__renderGradeDisplay = function() {
         });
 
         if (scores.length > 1) { 
-            // 🚨 [핵심 패치] 과목이 일치할 때만 합산하는 필터링 로직 추가!
             const calcAvg = (key, choiceKey, latestChoice) => {
                 const validScores = scores.filter(s => {
-                    // 과목 필터 키가 들어왔다면 최신 과목명과 일치하는 시험만 남김
                     if (choiceKey && latestChoice) {
                         return stdName(s[choiceKey]) === stdName(latestChoice);
                     }
-                    return true; // 영어나 한국사 등은 필터 패스
+                    return true; 
                 }).map(s => Number(s[key])).filter(val => !isNaN(val) && val > 0);
                 
                 if (validScores.length === 0) return '-';
