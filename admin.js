@@ -2668,7 +2668,7 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
 
                 <div style="margin-left:auto; position:relative;" onmouseenter="document.getElementById('hidden-rank-menu').style.display='block';" onmouseleave="document.getElementById('hidden-rank-menu').style.display='none';">
                     <div style="cursor:pointer; padding:6px 15px; background:#fdfdfd; border:1px solid #dee2e6; border-radius:6px; font-size:12px; font-weight:bold; color:#34495e; transition:all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02);" onmouseover="this.style.background='#f1f2f6'; this.style.borderColor='#bdc3c7';" onmouseout="this.style.background='#fdfdfd'; this.style.borderColor='#dee2e6';">
-                        🏆 등수 확인
+                        🏆 확인
                     </div>
                     
                    
@@ -2694,11 +2694,11 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
     </div>
 <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px; border-top:1px dashed #ecf0f1; padding-top:10px;">탐구</div>
 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-    <span style="font-size:11px; color:#2c3e50;">${myTam1Name || '탐구1'}</span> 
+    <span style="font-size:12px; color:#2c3e50;">${myTam1Name || '탐구1'}</span> 
     <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
 </div>
 <div style="display:flex; justify-content:space-between;">
-    <span style="font-size:11px; color:#2c3e50;">${myTam2Name || '탐구2'}</span> 
+    <span style="font-size:12px; color:#2c3e50;">${myTam2Name || '탐구2'}</span> 
     <span style="color:#f39c12; font-weight:900;">${tam2Result.rank} / ${tam2Result.count}명</span>
 </div>
 </div>
