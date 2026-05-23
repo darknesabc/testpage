@@ -2693,12 +2693,14 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
         <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
     </div>
 <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px; border-top:1px dashed #ecf0f1; padding-top:10px;">탐구</div>
+
 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-    <span style="font-size:12px; color:#2c3e50;">${myTam1Name || '탐구1'}</span> 
+    <span>${myTam1Name || '탐구1'}</span> 
     <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
 </div>
+
 <div style="display:flex; justify-content:space-between;">
-    <span style="font-size:12px; color:#2c3e50;">${myTam2Name || '탐구2'}</span> 
+    <span>${myTam2Name || '탐구2'}</span> 
     <span style="color:#f39c12; font-weight:900;">${tam2Result.rank} / ${tam2Result.count}명</span>
 </div>
 </div>
