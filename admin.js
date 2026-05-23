@@ -1905,11 +1905,16 @@ window.__renderGradeSummaryTable = function() {
         return val;
     };
 
-    area.innerHTML = `
+     area.innerHTML = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6;">
             <style>
-                /* ... 기존 스타일 ... */
-                .max-score-row { background:#fff9c4 !important; color:#d35400; }
+                .sum-table { width:100%; border-collapse:collapse; font-size:13px; text-align:center; color:#2c3e50; min-width:750px; background:#fff; }
+                .sum-table th, .sum-table td { border-bottom:1px solid #ecf0f1; padding:12px 10px; height: 45px; }
+                .sum-table th { color:#7f8c8d; background:#fbfbfc; border-bottom:2px solid #dee2e6; font-weight:bold; }
+                .sum-table td.header-col { font-weight:bold; color:#7f8c8d; background:#fbfbfc; border-right:1px solid #ecf0f1; width:110px; text-align:left; padding-left:20px; }
+                .sum-table td { font-weight:bold; font-size: 14px; }
+                .sum-kor { color:#3498db; } .sum-math { color:#e74c3c; } .sum-tam1 { color:#27ae60; } .sum-tam2 { color:#f39c12; }
+                .sum-eng { color:#9b59b6; }
             </style>
             <table class="sum-table">
                 <thead>
