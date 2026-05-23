@@ -1866,22 +1866,8 @@ window.__changeSummaryExam = function(examLabel) {
 // =========================================================
 window.__renderGradeSummaryTable = function() {
     const area = document.getElementById('grade-summary-table-area');
-    const scores = window.__currentStudentScores; // 이 학생의 모든 성적
-    const score = scores.find(s => s.exam_label === window.__currentSummaryExam) || {}; // 현재 선택된 시험 성적
+    const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
     
-    // 💡 [수정] 해당 시험(exam_label) 전체 학생 데이터에서 해당 과목의 최고점 찾기
-    const getExamMax = (subjKey) => {
-        // window.__allMockScores: 전체 학생의 모든 시험 데이터
-        const examScores = window.__allMockScores.filter(s => s.exam_label === window.__currentSummaryExam);
-        const valid = examScores.map(s => Number(s[subjKey])).filter(v => !isNaN(v) && v > 0);
-        return valid.length > 0 ? Math.max(...valid) : '-';
-    };
-
-    const maxKor = getExamMax('kor_exp_std');
-    const maxMath = getExamMax('math_exp_std');
-    const maxTam1 = getExamMax('tam1_exp_std');
-    const maxTam2 = getExamMax('tam2_exp_std');
-
     // 💡 [도우미 1] 줄임말 과목명을 표준 명칭으로 변경
     const stdName = (n) => {
         if (!n || n === '-' || n === 'null') return '-';
@@ -1905,7 +1891,7 @@ window.__renderGradeSummaryTable = function() {
         return val;
     };
 
-     area.innerHTML = `
+    area.innerHTML = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6;">
             <style>
                 .sum-table { width:100%; border-collapse:collapse; font-size:13px; text-align:center; color:#2c3e50; min-width:750px; background:#fff; }
@@ -1925,17 +1911,10 @@ window.__renderGradeSummaryTable = function() {
                         <td class="header-col">선택과목</td>
                         <td class="sum-kor">${stdName(score.kor_choice)}</td>
                         <td class="sum-math">${stdName(score.math_choice)}</td>
-                        <td>-</td><td>-</td>
+                        <td>-</td>
+                        <td>-</td>
                         <td class="sum-tam1">${stdName(score.tam1_name)}</td>
                         <td class="sum-tam2">${stdName(score.tam2_name)}</td>
-                    </tr>
-                    <tr class="max-score-row">
-                        <td class="header-col">시험 최고점</td>
-                        <td>${maxKor}</td>
-                        <td>${maxMath}</td>
-                        <td>-</td><td>-</td>
-                        <td>${maxTam1}</td>
-                        <td>${maxTam2}</td>
                     </tr>
                     <tr>
                         <td class="header-col">원점수</td>
