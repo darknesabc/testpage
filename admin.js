@@ -2685,7 +2685,6 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
     <div style="display:flex; justify-content:space-between;">
         <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
     </div>
-    // 히든 메뉴 UI 수정 예시
 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
     <span style="font-size:11px;">${myTam1Name || '탐구1'}</span> 
     <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
