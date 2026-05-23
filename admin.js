@@ -1866,8 +1866,20 @@ window.__changeSummaryExam = function(examLabel) {
 // =========================================================
 window.__renderGradeSummaryTable = function() {
     const area = document.getElementById('grade-summary-table-area');
-    const score = window.__currentStudentScores.find(s => s.exam_label === window.__currentSummaryExam) || {};
+    const scores = window.__currentStudentScores; // 전체 시험 데이터
+    const score = scores.find(s => s.exam_label === window.__currentSummaryExam) || {}; // 현재 보고 있는 시험
     
+    // 💡 최고 표준점수 계산 로직
+    const getMax = (key) => {
+        const valid = scores.map(s => Number(s[key])).filter(v => !isNaN(v) && v > 0);
+        return valid.length > 0 ? Math.max(...valid) : '-';
+    };
+
+    const maxKor = getMax('kor_exp_std');
+    const maxMath = getMax('math_exp_std');
+    const maxTam1 = getMax('tam1_exp_std');
+    const maxTam2 = getMax('tam2_exp_std');
+
     // 💡 [도우미 1] 줄임말 과목명을 표준 명칭으로 변경
     const stdName = (n) => {
         if (!n || n === '-' || n === 'null') return '-';
@@ -1895,12 +1907,13 @@ window.__renderGradeSummaryTable = function() {
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6;">
             <style>
                 .sum-table { width:100%; border-collapse:collapse; font-size:13px; text-align:center; color:#2c3e50; min-width:750px; background:#fff; }
-                .sum-table th, .sum-table td { border-bottom:1px solid #ecf0f1; padding:12px 10px; height: 45px; }
+                .sum-table th, .sum-table td { border-bottom:1px solid #ecf0f1; padding:10px 10px; height: 40px; }
                 .sum-table th { color:#7f8c8d; background:#fbfbfc; border-bottom:2px solid #dee2e6; font-weight:bold; }
                 .sum-table td.header-col { font-weight:bold; color:#7f8c8d; background:#fbfbfc; border-right:1px solid #ecf0f1; width:110px; text-align:left; padding-left:20px; }
                 .sum-table td { font-weight:bold; font-size: 14px; }
                 .sum-kor { color:#3498db; } .sum-math { color:#e74c3c; } .sum-tam1 { color:#27ae60; } .sum-tam2 { color:#f39c12; }
                 .sum-eng { color:#9b59b6; }
+                .max-score-row { background:#fff9c4 !important; color:#d35400; } /* 💡 최고점 강조 컬러 */
             </style>
             <table class="sum-table">
                 <thead>
@@ -1915,6 +1928,15 @@ window.__renderGradeSummaryTable = function() {
                         <td>-</td>
                         <td class="sum-tam1">${stdName(score.tam1_name)}</td>
                         <td class="sum-tam2">${stdName(score.tam2_name)}</td>
+                    </tr>
+                    <tr class="max-score-row">
+                        <td class="header-col">최고 표점</td>
+                        <td>${maxKor}</td>
+                        <td>${maxMath}</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>${maxTam1}</td>
+                        <td>${maxTam2}</td>
                     </tr>
                     <tr>
                         <td class="header-col">원점수</td>
