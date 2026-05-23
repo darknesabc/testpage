@@ -2633,6 +2633,28 @@ const myTam2Raw = Number(currentStudentScore.tam2_raw) || 0;
 // 학생 본인의 탐구1, 탐구2 등수 계산
 const tam1Result = myTam1Name ? getCombinedTamRank(myTam1Name, myTam1Raw) : { rank: '-', count: 0 };
 const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { rank: '-', count: 0 };
+
+    // 💡 4. 전체 등수 및 반 등수 계산 (국+수+탐1+탐2 표준점수 합산 기준)
+const getStdSum = (s) => (Number(s.kor_raw)||0) + (Number(s.math_raw)||0) + (Number(s.tam1_raw)||0) + (Number(s.tam2_raw)||0);
+const myStdSum = getStdSum(currentStudentScore);
+const myClass = window.__currentStudentClass || '미배정';
+
+// (1) 해당 시험 전체 등수
+let totalExamRank = '-', totalExamCount = 0;
+if (myStdSum > 0) {
+    const allStdSums = allTargetExamScores.map(s => getStdSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+    totalExamCount = allStdSums.length;
+    totalExamRank = allStdSums.indexOf(myStdSum) + 1;
+}
+
+// (2) 해당 시험 반 등수
+let classExamRank = '-', classExamCount = 0;
+if (myStdSum > 0 && myClass !== '미배정') {
+    const classScores = allTargetExamScores.filter(s => s.class_name === myClass);
+    const classStdSums = classScores.map(s => getStdSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+    classExamCount = classStdSums.length;
+    classExamRank = classStdSums.indexOf(myStdSum) + 1;
+}
     
     container.innerHTML = `
         <div style="background:#fff; padding:25px; border-radius:12px; border:1px solid #dee2e6; box-shadow:0 4px 6px rgba(0,0,0,0.02); margin-top:20px;">
@@ -2672,11 +2694,22 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
                     </div>
                     
                    
-<div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:230px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
+<div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:240px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
     <div style="font-size:11px; color:#95a5a6; margin-bottom:12px; font-weight:bold; border-bottom:1px dashed #ecf0f1; padding-bottom:6px;">
         📊 기준 시험: <span style="color:#2c3e50;">${targetExam || '-'}</span>
     </div>
-    
+
+    <div style="background:#f4f6f7; border-radius:6px; padding:10px; margin-bottom:15px; border:1px solid #ecf0f1;">
+        <div style="font-size:11px; color:#7f8c8d; margin-bottom:6px; font-weight:bold; text-align:center;">🏆 국·수·탐 표준점수 합산 기준</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:12px; font-weight:bold; color:#34495e;">전체 등수</span> 
+            <span style="color:#8e44ad; font-weight:900; font-size:13px;">${totalExamRank} / ${totalExamCount}명</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+            <span style="font-size:12px; font-weight:bold; color:#34495e;">반 등수 <span style="font-size:10px; color:#95a5a6;">(${myClass})</span></span> 
+            <span style="color:#27ae60; font-weight:900; font-size:13px;">${classExamRank} / ${classExamCount}명</span>
+        </div>
+    </div>
     <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">국어</div>
     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
         <span>전체</span> <span style="color:#3498db; font-weight:900;">${korTotalRank} / ${korTotalCount}명</span>
@@ -2692,17 +2725,16 @@ const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { ra
     <div style="display:flex; justify-content:space-between;">
         <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
     </div>
-<div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px; border-top:1px dashed #ecf0f1; padding-top:10px;">탐구</div>
 
-<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-    <span>${myTam1Name || '탐구1'}</span> 
-    <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
-</div>
-
-<div style="display:flex; justify-content:space-between;">
-    <span>${myTam2Name || '탐구2'}</span> 
-    <span style="color:#f39c12; font-weight:900;">${tam2Result.rank} / ${tam2Result.count}명</span>
-</div>
+    <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px; border-top:1px dashed #ecf0f1; padding-top:10px;">탐구</div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+        <span>${myTam1Name || '탐구1'}</span> 
+        <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+        <span>${myTam2Name || '탐구2'}</span> 
+        <span style="color:#f39c12; font-weight:900;">${tam2Result.rank} / ${tam2Result.count}명</span>
+    </div>
 </div>
                 </div>
                 </div>
