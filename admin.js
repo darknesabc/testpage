@@ -2635,25 +2635,41 @@ const tam1Result = myTam1Name ? getCombinedTamRank(myTam1Name, myTam1Raw) : { ra
 const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { rank: '-', count: 0 };
 
     // 💡 4. 전체 등수 및 반 등수 계산 (국+수+탐1+탐2 표준점수 합산 기준)
-const getStdSum = (s) => (Number(s.kor_raw)||0) + (Number(s.math_raw)||0) + (Number(s.tam1_raw)||0) + (Number(s.tam2_raw)||0);
-const myStdSum = getStdSum(currentStudentScore);
-const myClass = window.__currentStudentClass || '미배정';
+const getRawSum = (s) => (Number(s.kor_raw_total)||0) + (Number(s.math_raw_total)||0) + (Number(s.tam1_raw)||0) + (Number(s.tam2_raw)||0);
+const myRawSum = getRawSum(currentStudentScore);
+
+const myClassGroup = String(currentStudentScore.class_group || '미배정').trim();
 
 // (1) 해당 시험 전체 등수
 let totalExamRank = '-', totalExamCount = 0;
-if (myStdSum > 0) {
-    const allStdSums = allTargetExamScores.map(s => getStdSum(s)).filter(v => v > 0).sort((a, b) => b - a);
-    totalExamCount = allStdSums.length;
-    totalExamRank = allStdSums.indexOf(myStdSum) + 1;
+if (myRawSum > 0) {
+    const allRawSums = allTargetExamScores.map(s => getRawSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+    totalExamCount = allRawSums.length;
+    totalExamRank = allRawSums.indexOf(myRawSum) + 1;
 }
 
-// (2) 해당 시험 반 등수
+// (2) 해당 시험 반(그룹) 등수
 let classExamRank = '-', classExamCount = 0;
-if (myStdSum > 0 && myClass !== '미배정') {
-    const classScores = allTargetExamScores.filter(s => s.class_name === myClass);
-    const classStdSums = classScores.map(s => getStdSum(s)).filter(v => v > 0).sort((a, b) => b - a);
-    classExamCount = classStdSums.length;
-    classExamRank = classStdSums.indexOf(myStdSum) + 1;
+if (myRawSum > 0 && myClassGroup !== '미배정') {
+    const groupScores = allTargetExamScores.filter(s => {
+        const sGroup = String(s.class_group || '').trim();
+        return sGroup === myClassGroup || sGroup.includes(myClassGroup) || myClassGroup.includes(sGroup);
+    });
+
+    if (groupScores.length > 0) {
+        const groupRawSums = groupScores.map(s => getRawSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+        classExamCount = groupRawSums.length;
+        
+        const myRankIdx = groupRawSums.indexOf(myRawSum);
+        if (myRankIdx !== -1) {
+            classExamRank = myRankIdx + 1;
+        } else {
+            groupRawSums.push(myRawSum);
+            groupRawSums.sort((a, b) => b - a);
+            classExamCount = groupRawSums.length;
+            classExamRank = groupRawSums.indexOf(myRawSum) + 1;
+        }
+    }
 }
     
     container.innerHTML = `
@@ -2700,13 +2716,13 @@ if (myStdSum > 0 && myClass !== '미배정') {
     </div>
 
     <div style="background:#f4f6f7; border-radius:6px; padding:10px; margin-bottom:15px; border:1px solid #ecf0f1;">
-        <div style="font-size:11px; color:#7f8c8d; margin-bottom:6px; font-weight:bold; text-align:center;">🏆 국·수·탐 표준점수 합산 기준</div>
+        <div style="font-size:11px; color:#7f8c8d; margin-bottom:6px; font-weight:bold; text-align:center;">🏆 국·수·탐 원점수 합산 기준</div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:bold; color:#34495e;">전체 등수</span> 
             <span style="color:#8e44ad; font-weight:900; font-size:13px;">${totalExamRank} / ${totalExamCount}명</span>
         </div>
         <div style="display:flex; justify-content:space-between;">
-            <span style="font-size:12px; font-weight:bold; color:#34495e;">반 등수 <span style="font-size:10px; color:#95a5a6;">(${myClass})</span></span> 
+            <span style="font-size:12px; font-weight:bold; color:#34495e;">반 등수 <span style="font-size:10px; color:#95a5a6;">(${myClassGroup})</span></span> 
             <span style="color:#27ae60; font-weight:900; font-size:13px;">${classExamRank} / ${classExamCount}명</span>
         </div>
     </div>
