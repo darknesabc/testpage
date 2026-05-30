@@ -2716,10 +2716,14 @@ if (myRawSum > 0) {
 let classExamRank = '-', classExamCount = 0;
 if (myRawSum > 0 && myClassGroup !== '미배정') {
     const groupScores = allTargetExamScores.filter(s => {
-        const sGroup = String(s.class_group || '').trim();
-        return sGroup === myClassGroup || sGroup.includes(myClassGroup) || myClassGroup.includes(sGroup);
-    });
+    const sGroup = String(s.class_group || '').trim();
+    
+    // 1. 소속 반이 비어있거나 '미배정'인 학생은 무조건 제외 (가짜 true 방지)
+    if (sGroup === '' || sGroup === '미배정') return false;
 
+    // 2. 반 이름이 정확히 일치하는 학생만 포함 (가장 안전한 방식)
+    return sGroup === myClassGroup; 
+});
     if (groupScores.length > 0) {
         const groupRawSums = groupScores.map(s => getRawSum(s)).filter(v => v > 0).sort((a, b) => b - a);
         classExamCount = groupRawSums.length;
@@ -2766,10 +2770,13 @@ if (myPctSum > 0) {
 let classExamPctRank = '-', classExamPctCount = 0;
 if (myPctSum > 0 && myClassGroup !== '미배정') {
     const groupScores = allTargetExamScores.filter(s => {
-        const sGroup = String(s.class_group || '').trim();
-        return sGroup === myClassGroup || sGroup.includes(myClassGroup) || myClassGroup.includes(sGroup);
-    });
+    const sGroup = String(s.class_group || '').trim();
+    
+    // 이 줄을 무조건 추가해야 3명이 껴들어오는 버그를 막을 수 있습니다.
+    if (sGroup === '' || sGroup === '미배정') return false; 
 
+    return sGroup === myClassGroup || sGroup.includes(myClassGroup) || myClassGroup.includes(sGroup);
+});
     if (groupScores.length > 0) {
         const groupPctSums = groupScores.map(s => getPctSum(s)).filter(v => v > 0).sort((a, b) => b - a);
         classExamPctCount = groupPctSums.length;
