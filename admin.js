@@ -2577,7 +2577,10 @@ window.__renderGradeTrendUI = function() {
     const currentStudentScore = window.__currentStudentScores.find(s => s.exam_label === targetExam) || {};
     const allTargetExamScores = window.__allMockScores.filter(s => s.exam_label === targetExam);
 
-    // 1. 국어 등수 계산 (기존)
+// =================================================================
+// 1. 국어 등수 및 백분위 계산
+// =================================================================
+// (1) 원점수 기준 (기존)
 const myKorTotal = Number(currentStudentScore.kor_raw_total) || 0;
 let korTotalRank = '-', korTotalCount = 0;
 if (myKorTotal > 0) {
@@ -2593,7 +2596,26 @@ if (myKorTotal > 0 && myKorChoice) {
     korChoiceRank = korChoiceScores.indexOf(myKorTotal) + 1;
 }
 
-// 2. 💡 [수학 등수 계산 추가]
+// (2) 💡 예상 백분위 기준 (추가)
+const myKorPct = Number(currentStudentScore.kor_exp_pct) || 0;
+let korTotalPctRank = '-', korTotalPctCount = 0;
+if (myKorPct > 0) {
+    const korPctScores = allTargetExamScores.map(s => Number(s.kor_exp_pct)).filter(v => v > 0).sort((a, b) => b - a);
+    korTotalPctCount = korPctScores.length;
+    korTotalPctRank = korPctScores.indexOf(myKorPct) + 1;
+}
+let korChoicePctRank = '-', korChoicePctCount = 0;
+if (myKorPct > 0 && myKorChoice) {
+    const korChoicePctScores = allTargetExamScores.filter(s => s.kor_choice === myKorChoice).map(s => Number(s.kor_exp_pct)).filter(v => v > 0).sort((a, b) => b - a);
+    korChoicePctCount = korChoicePctScores.length;
+    korChoicePctRank = korChoicePctScores.indexOf(myKorPct) + 1;
+}
+
+
+// =================================================================
+// 2. 수학 등수 및 백분위 계산
+// =================================================================
+// (1) 원점수 기준 (기존)
 const myMathTotal = Number(currentStudentScore.math_raw_total) || 0;
 let mathTotalRank = '-', mathTotalCount = 0;
 if (myMathTotal > 0) {
@@ -2608,15 +2630,33 @@ if (myMathTotal > 0 && myMathChoice) {
     mathChoiceCount = mathChoiceScores.length;
     mathChoiceRank = mathChoiceScores.indexOf(myMathTotal) + 1;
 }
+
+// (2) 💡 예상 백분위 기준 (추가)
+const myMathPct = Number(currentStudentScore.math_exp_pct) || 0; // 💡 DB 컬럼명 확인 필요
+let mathTotalPctRank = '-', mathTotalPctCount = 0;
+if (myMathPct > 0) {
+    const mathPctScores = allTargetExamScores.map(s => Number(s.math_exp_pct)).filter(v => v > 0).sort((a, b) => b - a);
+    mathTotalPctCount = mathPctScores.length;
+    mathTotalPctRank = mathPctScores.indexOf(myMathPct) + 1;
+}
+let mathChoicePctRank = '-', mathChoicePctCount = 0;
+if (myMathPct > 0 && myMathChoice) {
+    const mathChoicePctScores = allTargetExamScores.filter(s => s.math_choice === myMathChoice).map(s => Number(s.math_exp_pct)).filter(v => v > 0).sort((a, b) => b - a);
+    mathChoicePctCount = mathChoicePctScores.length;
+    mathChoicePctRank = mathChoicePctScores.indexOf(myMathPct) + 1;
+}
+
     
-// 💡 탐구 통합 등수 계산 로직 (선택과목명 기준)
+// =================================================================
+// 3. 탐구 통합 등수 및 백분위 계산 로직
+// =================================================================
+// (1) 원점수 기준 탐구 함수 (기존)
 const getCombinedTamRank = (targetTamName, myTamRaw) => {
-    // 전체 시험 데이터에서 탐구1 또는 탐구2에 해당 과목을 응시한 모든 학생을 추출
     const tamScores = allTargetExamScores.reduce((acc, s) => {
         if (s.tam1_name === targetTamName && Number(s.tam1_raw) > 0) acc.push(Number(s.tam1_raw));
         if (s.tam2_name === targetTamName && Number(s.tam2_raw) > 0) acc.push(Number(s.tam2_raw));
         return acc;
-    }, []).sort((a, b) => b - a); // 내림차순 정렬
+    }, []).sort((a, b) => b - a);
 
     return {
         rank: tamScores.indexOf(myTamRaw) + 1,
@@ -2624,23 +2664,48 @@ const getCombinedTamRank = (targetTamName, myTamRaw) => {
     };
 };
 
-// 학생 본인의 탐구 과목명 및 점수 선언 (이 부분이 꼭 있어야 합니다!)
+// (2) 💡 예상 백분위 기준 탐구 함수 (추가)
+const getCombinedTamPctRank = (targetTamName, myTamPct) => {
+    const tamPctScores = allTargetExamScores.reduce((acc, s) => {
+        if (s.tam1_name === targetTamName && Number(s.tam1_exp_pct) > 0) acc.push(Number(s.tam1_exp_pct)); // 💡 DB 컬럼명 확인 필요
+        if (s.tam2_name === targetTamName && Number(s.tam2_exp_pct) > 0) acc.push(Number(s.tam2_exp_pct)); // 💡 DB 컬럼명 확인 필요
+        return acc;
+    }, []).sort((a, b) => b - a);
+
+    return {
+        rank: tamPctScores.indexOf(myTamPct) + 1,
+        count: tamPctScores.length
+    };
+};
+
+// 학생 본인의 탐구 데이터 선언
 const myTam1Name = currentStudentScore.tam1_name;
 const myTam1Raw = Number(currentStudentScore.tam1_raw) || 0;
+const myTam1Pct = Number(currentStudentScore.tam1_exp_pct) || 0; // 💡 추가
+
 const myTam2Name = currentStudentScore.tam2_name;
 const myTam2Raw = Number(currentStudentScore.tam2_raw) || 0;
+const myTam2Pct = Number(currentStudentScore.tam2_exp_pct) || 0; // 💡 추가
 
-// 학생 본인의 탐구1, 탐구2 등수 계산
+// 학생 본인의 탐구1, 탐구2 등수 계산 (원점수 + 백분위 각각 진행)
 const tam1Result = myTam1Name ? getCombinedTamRank(myTam1Name, myTam1Raw) : { rank: '-', count: 0 };
 const tam2Result = myTam2Name ? getCombinedTamRank(myTam2Name, myTam2Raw) : { rank: '-', count: 0 };
 
-    // 💡 4. 전체 등수 및 반 등수 계산 (국+수+탐1+탐2 표준점수 합산 기준)
+const tam1PctResult = myTam1Name ? getCombinedTamPctRank(myTam1Name, myTam1Pct) : { rank: '-', count: 0 }; // 💡 추가
+const tam2PctResult = myTam2Name ? getCombinedTamPctRank(myTam2Name, myTam2Pct) : { rank: '-', count: 0 }; // 💡 추가
+
+
+// =================================================================
+// 4. 전체 등수 및 반 등수 계산 (원점수 합산 vs 백분위 합산)
+// =================================================================
+const myClassGroup = String(currentStudentScore.class_group || '미배정').trim();
+
+// -----------------------------------------------------------------
+// [방법 A] 원점수 총합 기준 (기존)
+// -----------------------------------------------------------------
 const getRawSum = (s) => (Number(s.kor_raw_total)||0) + (Number(s.math_raw_total)||0) + (Number(s.tam1_raw)||0) + (Number(s.tam2_raw)||0);
 const myRawSum = getRawSum(currentStudentScore);
 
-const myClassGroup = String(currentStudentScore.class_group || '미배정').trim();
-
-// (1) 해당 시험 전체 등수
 let totalExamRank = '-', totalExamCount = 0;
 if (myRawSum > 0) {
     const allRawSums = allTargetExamScores.map(s => getRawSum(s)).filter(v => v > 0).sort((a, b) => b - a);
@@ -2648,7 +2713,6 @@ if (myRawSum > 0) {
     totalExamRank = allRawSums.indexOf(myRawSum) + 1;
 }
 
-// (2) 해당 시험 반(그룹) 등수
 let classExamRank = '-', classExamCount = 0;
 if (myRawSum > 0 && myClassGroup !== '미배정') {
     const groupScores = allTargetExamScores.filter(s => {
@@ -2668,6 +2732,56 @@ if (myRawSum > 0 && myClassGroup !== '미배정') {
             groupRawSums.sort((a, b) => b - a);
             classExamCount = groupRawSums.length;
             classExamRank = groupRawSums.indexOf(myRawSum) + 1;
+        }
+    }
+}
+
+// 💡 [방법 B] 예상 백분위 총합 기준 등수 계산 (국+수+탐(평균) 기준)
+const getPctSum = (s) => {
+    const korPct = Number(s.kor_exp_pct) || 0;
+    const mathPct = Number(s.math_exp_pct) || 0;
+    const tam1Pct = Number(s.tam1_exp_pct) || 0;
+    const tam2Pct = Number(s.tam2_exp_pct) || 0;
+    
+    // 탐구 2과목 백분위의 평균 계산
+    const tamAvgPct = (tam1Pct + tam2Pct) / 2;
+    
+    // 국어 + 수학 + 탐구평균
+    return korPct + mathPct + tamAvgPct;
+};
+
+const myPctSum = getPctSum(currentStudentScore);
+
+// (이하 totalExamPctRank, classExamPctRank 계산 로직은 기존과 100% 동일하게 유지)
+
+// (1) 예상 백분위 합산 전체 등수
+let totalExamPctRank = '-', totalExamPctCount = 0;
+if (myPctSum > 0) {
+    const allPctSums = allTargetExamScores.map(s => getPctSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+    totalExamPctCount = allPctSums.length;
+    totalExamPctRank = allPctSums.indexOf(myPctSum) + 1;
+}
+
+// (2) 예상 백분위 합산 반 등수
+let classExamPctRank = '-', classExamPctCount = 0;
+if (myPctSum > 0 && myClassGroup !== '미배정') {
+    const groupScores = allTargetExamScores.filter(s => {
+        const sGroup = String(s.class_group || '').trim();
+        return sGroup === myClassGroup || sGroup.includes(myClassGroup) || myClassGroup.includes(sGroup);
+    });
+
+    if (groupScores.length > 0) {
+        const groupPctSums = groupScores.map(s => getPctSum(s)).filter(v => v > 0).sort((a, b) => b - a);
+        classExamPctCount = groupPctSums.length;
+        
+        const myPctRankIdx = groupPctSums.indexOf(myPctSum);
+        if (myPctRankIdx !== -1) {
+            classExamPctRank = myPctRankIdx + 1;
+        } else {
+            groupPctSums.push(myPctSum);
+            groupPctSums.sort((a, b) => b - a);
+            classExamPctCount = groupPctSums.length;
+            classExamPctRank = groupPctSums.indexOf(myPctSum) + 1;
         }
     }
 }
@@ -2710,12 +2824,13 @@ if (myRawSum > 0 && myClassGroup !== '미배정') {
                     </div>
                     
                    
-<div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:240px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
+<div id="hidden-rank-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:5px; width:340px; background:#fff; border:1px solid #bdc3c7; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:100; padding:15px; cursor:default;">
+    
     <div style="font-size:11px; color:#95a5a6; margin-bottom:12px; font-weight:bold; border-bottom:1px dashed #ecf0f1; padding-bottom:6px;">
         📊 기준 시험: <span style="color:#2c3e50;">${targetExam || '-'}</span>
     </div>
 
-    <div style="background:#f4f6f7; border-radius:6px; padding:10px; margin-bottom:15px; border:1px solid #ecf0f1;">
+    <div style="background:#f4f6f7; border-radius:6px; padding:10px; margin-bottom:8px; border:1px solid #ecf0f1;">
         <div style="font-size:11px; color:#7f8c8d; margin-bottom:6px; font-weight:bold; text-align:center;">🏆 국·수·탐 원점수 합산 기준</div>
         <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:bold; color:#34495e;">전체 등수</span> 
@@ -2726,30 +2841,71 @@ if (myRawSum > 0 && myClassGroup !== '미배정') {
             <span style="color:#27ae60; font-weight:900; font-size:13px;">${classExamRank} / ${classExamCount}명</span>
         </div>
     </div>
-    <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">국어</div>
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <span>전체</span> <span style="color:#3498db; font-weight:900;">${korTotalRank} / ${korTotalCount}명</span>
+
+    <div style="background:#fdfbf7; border-radius:6px; padding:10px; margin-bottom:15px; border:1px solid #f9e7d0;">
+        <div style="font-size:11px; color:#d35400; margin-bottom:6px; font-weight:bold; text-align:center;">🎯 국·수·탐 예상백분위 합산 기준</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="font-size:12px; font-weight:bold; color:#34495e;">전체 등수</span> 
+            <span style="color:#e67e22; font-weight:900; font-size:13px;">${totalExamPctRank} / ${totalExamPctCount}명</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+            <span style="font-size:12px; font-weight:bold; color:#34495e;">반 등수 <span style="font-size:10px; color:#95a5a6;">(${myClassGroup})</span></span> 
+            <span style="color:#d35400; font-weight:900; font-size:13px;">${classExamPctRank} / ${classExamPctCount}명</span>
+        </div>
     </div>
-    <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-        <span>${myKorChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${korChoiceRank} / ${korChoiceCount}명</span>
+
+    <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">국어</div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px;">
+        <span>전체</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#3498db; font-weight:900;">${korTotalRank}/${korTotalCount}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#2980b9; font-weight:900;">${korTotalPctRank}/${korTotalPctCount}명</span>
+        </span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:15px; font-size:12px;">
+        <span>${myKorChoice || '선택'}</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#e74c3c; font-weight:900;">${korChoiceRank}/${korChoiceCount}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#c0392b; font-weight:900;">${korChoicePctRank}/${korChoicePctCount}명</span>
+        </span>
     </div>
 
     <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">수학</div>
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <span>전체</span> <span style="color:#3498db; font-weight:900;">${mathTotalRank} / ${mathTotalCount}명</span>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px;">
+        <span>전체</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#3498db; font-weight:900;">${mathTotalRank}/${mathTotalCount}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#2980b9; font-weight:900;">${mathTotalPctRank}/${mathTotalPctCount}명</span>
+        </span>
     </div>
-    <div style="display:flex; justify-content:space-between;">
-        <span>${myMathChoice || '선택'}</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank} / ${mathChoiceCount}명</span>
+    <div style="display:flex; justify-content:space-between; font-size:12px;">
+        <span>${myMathChoice || '선택'}</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#e74c3c; font-weight:900;">${mathChoiceRank}/${mathChoiceCount}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#c0392b; font-weight:900;">${mathChoicePctRank}/${mathChoicePctCount}명</span>
+        </span>
     </div>
 
     <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:15px; margin-bottom:5px; border-top:1px dashed #ecf0f1; padding-top:10px;">탐구</div>
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <span>${myTam1Name || '탐구1'}</span> 
-        <span style="color:#27ae60; font-weight:900;">${tam1Result.rank} / ${tam1Result.count}명</span>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px;">
+        <span>${myTam1Name || '탐구1'}</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#27ae60; font-weight:900;">${tam1Result.rank}/${tam1Result.count}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#16a085; font-weight:900;">${tam1PctResult.rank}/${tam1PctResult.count}명</span>
+        </span>
     </div>
-    <div style="display:flex; justify-content:space-between;">
-        <span>${myTam2Name || '탐구2'}</span> 
-        <span style="color:#f39c12; font-weight:900;">${tam2Result.rank} / ${tam2Result.count}명</span>
+    <div style="display:flex; justify-content:space-between; font-size:12px;">
+        <span>${myTam2Name || '탐구2'}</span>
+        <span>
+            <span style="font-size:10px; color:#95a5a6;">원점수</span> <span style="color:#f39c12; font-weight:900;">${tam2Result.rank}/${tam2Result.count}명</span>
+            <span style="margin:0 4px; color:#ecf0f1;">|</span>
+            <span style="font-size:10px; color:#95a5a6;">백분위</span> <span style="color:#d35400; font-weight:900;">${tam2PctResult.rank}/${tam2PctResult.count}명</span>
+        </span>
     </div>
 </div>
                 </div>
