@@ -3136,7 +3136,7 @@ window.__renderGradeDisplay = function() {
         
         const latestScore = scores[scores.length - 1] || {};
 
-        // 💡 [도우미] 과목명 깔끔하게 줄이기 (코드 중복 방지를 위해 위로 배치)
+        // 💡 [도우미] 과목명 깔끔하게 줄이기
         const stdName = (n) => {
             if (!n || n === '-' || n === 'null') return '-';
             let str = String(n).trim();
@@ -3146,7 +3146,7 @@ window.__renderGradeDisplay = function() {
                      .replace(/한국지리|한지/, '한지').replace(/세계지리|세지/, '세지')
                      .replace(/동아시아사|동사|동아/, '동사').replace(/정치와법|정법/, '정법').replace(/윤리와사상|윤사/, '윤사')
                      .replace(/물리학1|물리1|물1/, '물1').replace(/화학1|화1/, '화1')
-                     .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1');
+                     .replace(/생명과학1|생명1|생물1|생1/, '생1').replace(/지구과학1|지구1|지학1|지1/, '지1').replace(/지구과학2|지구2|지학2|지2/, '지2');
             return str;
         };
         
@@ -3159,8 +3159,8 @@ window.__renderGradeDisplay = function() {
         let h = `
         <div style="overflow-x:auto; border-radius:8px; border:1px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
             <style>
-                /* 💡 열이 늘어났으므로 가로 스크롤이 예쁘게 생기도록 min-width를 1350px로 확장 */
-                .grade-trend-table { width:100%; border-collapse:collapse; text-align:center; font-size:13px; color:#2c3e50; min-width:1350px; background:#fff; }
+                /* 💡 열이 늘어났으므로 가로 스크롤이 예쁘게 생기도록 min-width를 1500px로 확장 */
+                .grade-trend-table { width:100%; border-collapse:collapse; text-align:center; font-size:13px; color:#2c3e50; min-width:1500px; background:#fff; }
                 .grade-trend-table th, .grade-trend-table td { border:1px solid #ecf0f1; padding:10px 4px; }
                 .grade-trend-table thead th { border-bottom:2px solid #dee2e6; }
                 .grade-trend-table tbody tr:hover { background:#fbfbfc; }
@@ -3170,6 +3170,7 @@ window.__renderGradeDisplay = function() {
                 .grade-trend-table .g-hist { background:rgba(142, 68, 173, 0.03); }
                 .grade-trend-table .g-tam1 { background:rgba(39, 174, 96, 0.03); }
                 .grade-trend-table .g-tam2 { background:rgba(243, 156, 18, 0.03); }
+                .grade-trend-table .g-total { background:rgba(44, 62, 80, 0.03); } /* 💡 총점 영역 배경색 */
             </style>
             <table class="grade-trend-table">
                 <thead>
@@ -3181,7 +3182,7 @@ window.__renderGradeDisplay = function() {
                         <th colspan="2" style="color:#7f8c8d;">한국사</th>
                         <th colspan="5" style="color:#27ae60;">${t1Title}</th>
                         <th colspan="5" style="color:#d35400;">${t2Title}</th>
-                    </tr>
+                        <th colspan="2" style="color:#2c3e50;">총점(국수탐)</th> </tr>
                     <tr style="font-size:11px; color:#7f8c8d; background:#fff;">
                         <th>선택과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
                         <th>선택과목</th><th>공통</th><th>선택</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
@@ -3189,12 +3190,35 @@ window.__renderGradeDisplay = function() {
                         <th>원점</th><th>등급</th>
                         <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
                         <th>과목</th><th>원점</th><th>표점</th><th>백분위</th><th>등급</th>
-                    </tr>
+                        <th>표점합</th><th>백분위</th> </tr>
                 </thead>
                 <tbody>
         `;
 
+        // 💡 하단 평균 계산을 위해 총점 데이터를 수집하는 배열
+        let validStdSums = [];
+        let validPctSums = [];
+
         scores.forEach(s => {
+            // 💡 [총점 계산 로직]
+            const korStd = Number(s.kor_exp_std) || 0;
+            const mathStd = Number(s.math_exp_std) || 0;
+            const tam1Std = Number(s.tam1_exp_std) || 0;
+            const tam2Std = Number(s.tam2_exp_std) || 0;
+            const totalStd = korStd + mathStd + tam1Std + tam2Std;
+
+            const korPct = Number(s.kor_exp_pct) || 0;
+            const mathPct = Number(s.math_exp_pct) || 0;
+            const tam1Pct = Number(s.tam1_exp_pct) || 0;
+            const tam2Pct = Number(s.tam2_exp_pct) || 0;
+            const totalPct = korPct + mathPct + ((tam1Pct + tam2Pct) / 2); // 💡 탐구 평균 반영
+
+            if (totalStd > 0) validStdSums.push(totalStd);
+            if (totalPct > 0) validPctSums.push(totalPct);
+
+            const displayTotalStd = totalStd > 0 ? totalStd : '-';
+            const displayTotalPct = totalPct > 0 ? (totalPct % 1 === 0 ? totalPct : totalPct.toFixed(1)) : '-';
+
             h += `
             <tr>
                 <td style="font-weight:bold; color:#2c3e50;">${s.exam_label}</td>
@@ -3213,18 +3237,19 @@ window.__renderGradeDisplay = function() {
                 <td class="g-tam1" style="font-size:12px; font-weight:bold;">${stdName(s.tam1_name)}</td><td class="g-tam1">${v(s.tam1_raw)}</td><td class="g-tam1">${v(s.tam1_exp_std)}</td><td class="g-tam1">${v(s.tam1_exp_pct)}</td><td class="g-tam1"><b>${v(s.tam1_exp_grade)}</b></td>
                 
                 <td class="g-tam2" style="font-size:12px; font-weight:bold;">${stdName(s.tam2_name)}</td><td class="g-tam2">${v(s.tam2_raw)}</td><td class="g-tam2">${v(s.tam2_exp_std)}</td><td class="g-tam2">${v(s.tam2_exp_pct)}</td><td class="g-tam2"><b>${v(s.tam2_exp_grade)}</b></td>
+
+                <td class="g-total" style="font-weight:900; color:#2c3e50;">${displayTotalStd}</td>
+                <td class="g-total" style="font-weight:900; color:#3498db;">${displayTotalPct}</td>
             </tr>`;
         });
 
         if (scores.length > 1) { 
-            // 🚨 [핵심 패치] 과목이 일치할 때만 합산하는 필터링 로직 추가!
             const calcAvg = (key, choiceKey, latestChoice) => {
                 const validScores = scores.filter(s => {
-                    // 과목 필터 키가 들어왔다면 최신 과목명과 일치하는 시험만 남김
                     if (choiceKey && latestChoice) {
                         return stdName(s[choiceKey]) === stdName(latestChoice);
                     }
-                    return true; // 영어나 한국사 등은 필터 패스
+                    return true; 
                 }).map(s => Number(s[key])).filter(val => !isNaN(val) && val > 0);
                 
                 if (validScores.length === 0) return '-';
@@ -3236,6 +3261,10 @@ window.__renderGradeDisplay = function() {
                 if (validScores.length === 0) return '-';
                 return (validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length).toFixed(1);
             };
+
+            // 💡 추가: 총점(표점, 백분위) 평균 계산
+            const avgTotalStd = validStdSums.length > 0 ? (validStdSums.reduce((a, b) => a + b, 0) / validStdSums.length).toFixed(1) : '-';
+            const avgTotalPct = validPctSums.length > 0 ? (validPctSums.reduce((a, b) => a + b, 0) / validPctSums.length).toFixed(1) : '-';
 
             h += `
             <tr style="background:#e8f4f8; font-weight:bold; border-top: 2px solid #bdc3c7;">
@@ -3271,6 +3300,9 @@ window.__renderGradeDisplay = function() {
                 <td class="g-tam2">${calcAvg('tam2_exp_std', 'tam2_name', latestScore.tam2_name)}</td>
                 <td class="g-tam2">${calcAvg('tam2_exp_pct', 'tam2_name', latestScore.tam2_name)}</td>
                 <td class="g-tam2" style="color:#d35400;">${calcAvg('tam2_exp_grade', 'tam2_name', latestScore.tam2_name)}</td>
+
+                <td class="g-total" style="font-weight:900; color:#2c3e50;">${avgTotalStd}</td>
+                <td class="g-total" style="font-weight:900; color:#3498db;">${avgTotalPct}</td>
             </tr>`;
         }
 
