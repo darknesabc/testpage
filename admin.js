@@ -326,7 +326,7 @@ document.addEventListener('keydown', function(e) {
 function getCurrentPeriod() {
     const SCHEDULE = [
         { p: "1", start: "08:00", end: "08:30" }, { p: "2", start: "08:50", end: "10:10" },
-        { p: "3", start: "10:30", end: "12:00" }, { p: "4", start: "13:10", end: "14:30" },
+        { p: "3", start: "10:30", end: "12:10" }, { p: "4", start: "13:20", end: "14:30" },
         { p: "5", start: "14:50", end: "15:50" }, { p: "6", start: "16:10", end: "17:30" },
         { p: "7", start: "18:40", end: "20:10" }, { p: "8", start: "20:30", end: "22:00" }
     ];
