@@ -267,10 +267,10 @@ window.__fetchRecentData = async function(tableName, dateCol, startDate) {
     while (fetchMore) {
         let query = _supabase.from(tableName).select('*').gte(dateCol, startDate).range(startIdx, startIdx + 999);
         
-        // 출결 데이터는 꼬이지 않게 학생/교시 순으로 고정 정렬
-        if (tableName === 'attendance') {
-            query = query.order('student_id', { ascending: true }).order('period', { ascending: true });
-        }
+        // 출결 데이터는 꼬이지 않게 학생/교시 순으로 고정 정렬 + 날짜순 정렬 추가(누락 완벽 방지)
+if (tableName === 'attendance') {
+    query = query.order('student_id', { ascending: true }).order('period', { ascending: true }).order('attendance_date', { ascending: false });
+}
         
         const { data, error } = await query;
         if (error) { console.error(`${tableName} 로드 에러:`, error); break; }
