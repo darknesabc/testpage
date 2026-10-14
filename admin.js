@@ -995,6 +995,8 @@ window.__toggleSmartAlert = function() {
 // =========================================================
 window.__loadStudentDetail = async function(student) {
     if (!student || !student.studentId) return;
+    // 💡 [버그 수정] 학생을 빠르게 바꿔 열 때 이전 학생 데이터가 섞이지 않도록 요청 번호 부여
+    const mySeq = ++window.__detailSeq;
 
     let detailSection = document.getElementById('student-detail-section');
     if (!detailSection) {
@@ -1016,6 +1018,7 @@ window.__loadStudentDetail = async function(student) {
             window.__fetchAllAttendance(student.studentId), // 1000개 무제한 함수
             _supabase.from('survey_log').select('*').eq('student_id', student.studentId)
         ]);
+        if (mySeq !== window.__detailSeq) return; // 그사이 다른 학생을 열었으면 그리지 않음
 
         // 💡 2. [에러 해결!] 여기서 교육점수를 헬퍼 함수에 통과시켜 processedEduData 변수를 만듭니다.
         const processedEduData = window.__processEduScores(resEduRaw.data);
@@ -1271,9 +1274,10 @@ processedMoveData.forEach(mv => {
             <div id="grade-summary-container"></div>
         `;
         detailSection.innerHTML = html;
-        window.__loadGradeTrend(student);
+        window.__loadGradeTrend(student, mySeq);
 
     } catch (err) {
+        if (mySeq !== window.__detailSeq) return;
         detailSection.innerHTML = `<div style="color:#e74c3c; text-align:center; padding:30px;"><b>오류가 발생했습니다:</b><br>${err.message}</div>`;
     }
 };
@@ -1281,32 +1285,22 @@ processedMoveData.forEach(mv => {
 // =========================================================
 // 4. 성적 요약 UI (버그 수정 완료)
 // =========================================================
-window.__loadGradeTrend = async function(student) {
+window.__loadGradeTrend = async function(student, seq) {
+    const mySeq = (seq === undefined) ? window.__detailSeq : seq;
     const trendContainer = document.getElementById('grade-trend-container');
     if (!trendContainer) return;
     try {
-        let allScores = [];
-        let fetchMore = true;
-        let startIdx = 0;
-
-        while (fetchMore) {
-            const { data, error } = await _supabase
+        // 💡 [속도 개선] 전체 모의고사 성적은 한 번 받으면 10분간 다시 받지 않음 (나눠 받기도 병렬로)
+        const res = await window.__cachedFetch(window.__mockCache.scores, 'all', () =>
+            window.__fetchAllPages(opts => _supabase
                 .from('mock_scores')
-                .select('*')
+                .select('*', opts)
                 .order('created_at', { ascending: true })
                 // 🚨 [원인 1 해결] 생성 시간이 똑같은 수천 개의 데이터가 꼬이지 않도록 id 정렬을 반드시 추가!
-                .order('id', { ascending: true }) 
-                .range(startIdx, startIdx + 999);
-
-            if (error) throw error;
-            if (data && data.length > 0) {
-                allScores = allScores.concat(data);
-                startIdx += 1000;
-                if (data.length < 1000) fetchMore = false;
-            } else {
-                fetchMore = false;
-            }
-        }
+                .order('id', { ascending: true }), 'mock_scores'));
+        if (res.error) throw res.error;
+        if (mySeq !== window.__detailSeq) return; // 💡 그사이 다른 학생을 열었으면 무시
+        const allScores = res.data || [];
 
         if (allScores.length === 0) return;
 
@@ -2030,11 +2024,16 @@ window.__loadGradeErrata = async function(examLabel) {
     }
     
     const studentId = String(scoreInfo.student_id || "").trim();
+    // 💡 [버그 수정] 학생/시험을 빠르게 바꿀 때 늦게 도착한 결과가 덮어쓰지 않도록
+    const mySeq = window.__detailSeq;
+    const myErrataSeq = ++window.__errataSeq;
+    const isStale = () => mySeq !== window.__detailSeq || myErrataSeq !== window.__errataSeq;
     const targetExams = window.__isCumulativeRadar ? window.__currentStudentScores.map(s => s.exam_label) : [examLabel];
 
     try {
-        const { data: unitMapData } = await _supabase.from('unit_map').select('*');
-        window.__unitMap = unitMapData || [];
+        const unitRes = await window.__cachedFetch(window.__mockCache.unitMap, 'all', () => _supabase.from('unit_map').select('*').then(r => r));
+        if (isStale()) return;
+        window.__unitMap = unitRes.data || [];
 
         let allMyErrata = [];
         let allQInfos = [];
@@ -2042,30 +2041,27 @@ window.__loadGradeErrata = async function(examLabel) {
 
         // window.__loadGradeErrata 내부의 fetchExamData 함수만 이 코드로 교체하세요
 const fetchExamData = async (ex) => {
-    // 1. 정오표(Errata) 가져오기 (기존 유지)
-    let allExErrata = [];
-    let fetchMoreE = true; let startIdxE = 0;
-    while(fetchMoreE) {
-        const {data, error} = await _supabase.from('mock_errata').select('*').eq('exam_label', ex).range(startIdxE, startIdxE + 999);
-        if (error) break;
-        if (data && data.length > 0) { allExErrata = allExErrata.concat(data); startIdxE += 1000; if(data.length < 1000) fetchMoreE = false; } else fetchMoreE = false;
-    }
+    // 1. 정오표(Errata) 가져오기
+    // 💡 [버그 수정] 정렬 기준을 고정해서 나눠 받을 때 중복/누락이 없게 + 시험별로 10분간 캐시
+    const errRes = await window.__cachedFetch(window.__mockCache.errata, ex, () =>
+        window.__fetchAllPages(opts => _supabase.from('mock_errata').select('*', opts).eq('exam_label', ex)
+            .order('student_id', { ascending: true }).order('period', { ascending: true })
+            .order('subject', { ascending: true }).order('seat_no', { ascending: true }), 'mock_errata'));
+    const allExErrata = errRes.data || [];
     
     const studentExErrata = allExErrata.filter(e => String(e.student_id || "").trim() === studentId || Object.values(e).some(val => String(val).trim() === studentId));
 
-    // 2. 문항 정보(Question Info) 가져오기 (페이지네이션 추가)
-    let qInfos = [];
-    let fetchMoreQ = true; let startIdxQ = 0;
-    while(fetchMoreQ) {
-        const { data: qData, error: qErr } = await _supabase.from('mock_question_info').select('*').eq('exam_label', ex).range(startIdxQ, startIdxQ + 999);
-        if (qErr) break;
-        if (qData && qData.length > 0) { qInfos = qInfos.concat(qData); startIdxQ += 1000; if(qData.length < 1000) fetchMoreQ = false; } else fetchMoreQ = false;
-    }
+    // 2. 문항 정보(Question Info) 가져오기 (정렬 고정 + 캐시)
+    const qRes = await window.__cachedFetch(window.__mockCache.qinfo, ex, () =>
+        window.__fetchAllPages(opts => _supabase.from('mock_question_info').select('*', opts).eq('exam_label', ex)
+            .order('subject', { ascending: true }).order('question_num', { ascending: true }), 'mock_question_info'));
+    const qInfos = qRes.data || [];
 
     return { ex, allExErrata, studentExErrata, qInfos };
 };
 
         const results = await Promise.all(targetExams.map(ex => fetchExamData(ex)));
+        if (isStale()) return;
         results.forEach(res => {
             if (res.ex === examLabel) currentExamAllErrata = res.allExErrata;
             allMyErrata = allMyErrata.concat(res.studentExErrata);
@@ -4334,6 +4330,53 @@ window.__renderSusiTable = function(grades) {
 
     container.innerHTML = `<div style="padding:10px; max-width:1200px; margin:0 auto; background:#f4f6f7; border-radius:8px;">${cardsHtml}</div>`;
 };
+
+// =========================================================
+// 💡 [신규] 상세 화면 공용 도우미
+// - 요청 번호: 학생/시험을 빠르게 바꿀 때 늦게 온 결과가 화면을 덮어쓰지 않게 함
+// - 모의고사 캐시: 전체 성적/정오표/문항정보/단원맵을 10분간 기억 (새 시험 업로드 직후엔 새로고침)
+// - Esc: 상세 모달 → 학생 상세 순서로 닫기
+// =========================================================
+window.__detailSeq = 0;
+window.__errataSeq = 0;
+const MOCK_CACHE_MS = 10 * 60 * 1000;
+window.__mockCache = { scores: {}, errata: {}, qinfo: {}, unitMap: {} };
+
+window.__cachedFetch = function(store, key, loader) {
+    const now = Date.now();
+    const hit = store[key];
+    if (hit && now - hit.at < MOCK_CACHE_MS) return hit.promise;
+    const promise = Promise.resolve().then(loader).then(r => {
+        if (!r || r.error) delete store[key]; // 실패한 결과는 기억하지 않음
+        return r;
+    }, e => { delete store[key]; throw e; });
+    store[key] = { at: now, promise };
+    return promise;
+};
+
+window.__closeStudentDetail = function() {
+    const detail = document.getElementById('student-detail-section');
+    if (!detail || detail.style.display === 'none') return false;
+    detail.style.display = 'none';
+    const dash = document.getElementById('dashboard');
+    if (dash) dash.style.display = 'grid';
+    const summary = document.getElementById('status-summary');
+    if (summary) summary.style.display = 'block';
+    const mainFoldBtn = document.getElementById('dashboard-fold-btn');
+    if (mainFoldBtn) { mainFoldBtn.innerText = '바둑판 접기 ⬆'; mainFoldBtn.style.background = '#7f8c8d'; }
+    return true;
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const modal = document.getElementById('custom-detail-modal');
+    if (modal && modal.style.display !== 'none') {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        return;
+    }
+    window.__closeStudentDetail();
+});
 
 // =========================================================
 // 💡 [신규 기능] 학생 검색 + 현재 교시 출결 요약
