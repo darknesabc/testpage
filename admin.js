@@ -538,6 +538,14 @@ async function init() {
                     <button id="dashboard-fold-btn" onclick="window.__toggleDashboard()" style="padding:6px 15px; border-radius:6px; border:none; cursor:pointer; font-size:13px; font-weight:bold; transition:0.2s; background:#7f8c8d; color:white; margin-left:10px;">바둑판 접기 ⬆</button>
                 </div>
             </div>
+
+            <!-- 💡 [신규] 학생 검색 + 현재 교시 출결 요약 -->
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+                <input id="dash-search" type="search" autocomplete="off" placeholder="🔍 이름 또는 좌석 검색" title="1명만 남으면 Enter로 바로 열기, Esc로 지우기" value="${window.__escAttr(window.__searchTerm)}" oninput="window.__setDashSearch(this.value)" onkeydown="window.__dashSearchKey(event)" style="flex:0 1 300px; min-width:200px; padding:8px 12px; border:1px solid #bdc3c7; border-radius:8px; font-size:14px; outline:none;">
+                <span style="font-size:13px; font-weight:bold; color:#2c3e50;">${currentP}교시 출결</span>
+                <div id="period-summary" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                <span id="dash-filter-info" style="font-size:12px; color:#7f8c8d;"></span>
+            </div>
         `;
 
         // 💡 [버그 수정] 학생이 1000명을 넘으면 잘리던 문제 → 나눠 받기
@@ -625,6 +633,7 @@ async function init() {
         const surveyById = groupById(resSurvey.data), eduById = groupById(processedEduData);
 
         const cardsHtml = []; // 💡 [속도 개선] 카드를 모았다가 마지막에 한 번만 그림
+        const statusCounts = {}; // 💡 [신규] 현재 교시 출결 상태별 인원
 
         students.forEach(s => {
             const stAtts7d = attById.get(s.student_id) || [];
@@ -822,7 +831,7 @@ else {
                 const tCount = students.filter(x => (x.teacher_name || '미배정') === window.__currentTeacherLabel).length;
                 
                 cardsHtml.push(`
-                    <div onclick="window.__toggleTeacherGroup('teacher-group-${teacherIdx}')" style="grid-column: 1 / -1; cursor:pointer; background:#34495e; color:#fff; padding:8px 15px; border-radius:8px; font-weight:bold; font-size:14px; margin-top:15px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:0.2s;" onmouseover="this.style.background='#2c3e50'" onmouseout="this.style.background='#34495e'">
+                    <div data-group-header="teacher-group-${teacherIdx}" onclick="window.__toggleTeacherGroup('teacher-group-${teacherIdx}')" style="grid-column: 1 / -1; cursor:pointer; background:#34495e; color:#fff; padding:8px 15px; border-radius:8px; font-weight:bold; font-size:14px; margin-top:15px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:0.2s;" onmouseover="this.style.background='#2c3e50'" onmouseout="this.style.background='#34495e'">
                         <span style="display:flex; align-items:center; gap:8px;">
                             👨‍🏫 ${window.__currentTeacherLabel} 선생님 반 
                             <span style="font-size:11px; font-weight:normal; opacity:0.7; background:rgba(0,0,0,0.2); padding:2px 6px; border-radius:4px;">클릭하여 접기/펴기</span>
@@ -838,8 +847,10 @@ else {
             // 💡 [신규] 카드 껍데기에 반별 고유 클래스(teacher-group-번호)를 붙여줍니다.
             const groupClass = window.__currentSortMode === 'teacher' ? `teacher-group-${teacherIdx}` : '';
             
+            statusCounts[color] = (statusCounts[color] || 0) + 1;
+
             cardsHtml.push(`
-                <div class="card status-${color} ${groupClass}" style="position:relative; cursor:pointer; transition: opacity 0.2s, transform 0.2s;" onclick="window.__loadStudentDetail(window.__dashboardItems.find(x => x.studentId === '${s.student_id}'))">
+                <div class="card status-${color} ${groupClass}" data-sid="${window.__escAttr(s.student_id)}" data-name="${window.__escAttr(s.name)}" data-seat="${window.__escAttr(s.seat_no)}" data-status="${window.__escAttr(color)}" style="position:relative; cursor:pointer; transition: opacity 0.2s, transform 0.2s;" onclick="window.__loadStudentDetail(window.__dashboardItems.find(x => x.studentId === '${s.student_id}'))">
                     <div class="seat" style="font-size:11px; opacity:0.7;">${s.seat_no}</div>
                     <div class="name" style="font-size:18px; margin: 5px 0;">${s.name}</div>
                     <div class="status-badge badge-${color}" style="font-size:13px; font-weight:900; display: inline-block; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; line-height: 1.4; padding: 2px 8px; margin: 2px auto;">
@@ -858,6 +869,9 @@ else {
         });
 
         dashboard.innerHTML = cardsHtml.join(''); // 💡 [속도 개선] 바둑판을 한 번에 그림
+        window.__periodCounts = statusCounts;
+        window.__renderPeriodSummary();
+        window.__applyDashboardFilter();
 
         // 🚨 알림판 UI 렌더러 (이름 클릭 🔗 연동)
         const buildAlertRow = (title, icon, items, color, bgColor) => {
@@ -4322,6 +4336,135 @@ window.__renderSusiTable = function(grades) {
 };
 
 // =========================================================
+// 💡 [신규 기능] 학생 검색 + 현재 교시 출결 요약
+// - 검색: 이름/좌석 일부만 입력해도 걸러짐, 1명만 남으면 Enter로 상세 열기, Esc로 지우기
+// - 요약: 현재(또는 선택한) 교시의 출결 상태별 인원, 누르면 그 학생들만 보기
+// - 검색어/선택한 상태는 자동 새로고침 후에도 유지
+// =========================================================
+window.__searchTerm = '';
+window.__statusFilter = null;
+window.__periodCounts = {};
+
+window.__escAttr = function(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+};
+
+(function injectDashFilterStyle() {
+    if (document.getElementById('dash-filter-style')) return;
+    const st = document.createElement('style');
+    st.id = 'dash-filter-style';
+    st.textContent = '.dash-hidden{display:none !important;}';
+    (document.head || document.body).appendChild(st);
+})();
+
+const PERIOD_STATUS_CHIPS = [
+    { key: '1',        label: '출석',      color: '#27ae60', bg: '#eafaf1' },
+    { key: '2',        label: '지각',      color: '#e67e22', bg: '#fef5e7' },
+    { key: '3',        label: '결석',      color: '#e74c3c', bg: '#fdedec' },
+    { key: 'move',     label: '이동',      color: '#8e44ad', bg: '#f4ecf7' },
+    { key: 'schedule', label: '사유·일정', color: '#2980b9', bg: '#ebf5fb' },
+    { key: 'none',     label: '미입력',    color: '#7f8c8d', bg: '#f2f3f4' }
+];
+
+window.__renderPeriodSummary = function() {
+    const box = document.getElementById('period-summary');
+    if (!box) return;
+    const counts = window.__periodCounts || {};
+    const known = PERIOD_STATUS_CHIPS.map(c => c.key);
+    const otherCount = Object.keys(counts).filter(k => !known.includes(k)).reduce((sum, k) => sum + counts[k], 0);
+    const chips = PERIOD_STATUS_CHIPS.map(c => ({ ...c, n: counts[c.key] || 0 }));
+    if (otherCount > 0) chips.push({ key: '__other', label: '기타', color: '#34495e', bg: '#eef0f2', n: otherCount });
+
+    box.innerHTML = chips.map(c => {
+        const active = window.__statusFilter === c.key;
+        return `<button type="button" onclick="window.__toggleStatusFilter('${c.key}')" title="${c.label} 학생만 보기"
+            style="padding:5px 11px; border-radius:16px; cursor:pointer; font-size:13px; font-weight:bold; transition:0.15s;
+            border:1px solid ${active ? c.color : 'transparent'}; background:${active ? c.color : c.bg}; color:${active ? '#fff' : c.color};
+            ${c.n === 0 && !active ? 'opacity:0.45;' : ''}">${c.label} ${c.n}</button>`;
+    }).join('');
+};
+
+window.__applyDashboardFilter = function() {
+    const dash = document.getElementById('dashboard');
+    if (!dash) return 0;
+    const term = (window.__searchTerm || '').trim().toLowerCase();
+    const sf = window.__statusFilter;
+    const known = PERIOD_STATUS_CHIPS.map(c => c.key);
+    let shown = 0, total = 0;
+    const groupVisible = {};
+
+    dash.querySelectorAll('.card[data-sid]').forEach(card => {
+        total++;
+        const name = (card.getAttribute('data-name') || '').toLowerCase();
+        const seat = (card.getAttribute('data-seat') || '').toLowerCase();
+        const st = card.getAttribute('data-status');
+        const okTerm = !term || name.includes(term) || seat.includes(term);
+        const okStatus = !sf || (sf === '__other' ? !known.includes(st) : st === sf);
+        const ok = okTerm && okStatus;
+        card.classList.toggle('dash-hidden', !ok);
+        if (ok) {
+            shown++;
+            const g = Array.from(card.classList).find(c => c.indexOf('teacher-group-') === 0);
+            if (g) groupVisible[g] = true;
+        }
+    });
+
+    const filtering = !!(term || sf);
+    dash.querySelectorAll('[data-group-header]').forEach(h => {
+        h.classList.toggle('dash-hidden', filtering && !groupVisible[h.getAttribute('data-group-header')]);
+    });
+
+    const info = document.getElementById('dash-filter-info');
+    if (info) {
+        info.innerHTML = filtering
+            ? `<b style="color:#2c3e50;">${shown}명</b> 표시 / 전체 ${total}명 <a href="javascript:void(0);" onclick="window.__clearDashFilter()" style="margin-left:6px; color:#e74c3c; font-weight:bold;">필터 해제 ✕</a>`
+            : '';
+    }
+    return shown;
+};
+
+window.__showDashboardIfFolded = function() {
+    const dash = document.getElementById('dashboard');
+    if (dash && dash.style.display === 'none') window.__toggleDashboard();
+};
+
+window.__setDashSearch = function(value) {
+    window.__searchTerm = value || '';
+    if (window.__searchTerm.trim()) window.__showDashboardIfFolded();
+    window.__applyDashboardFilter();
+};
+
+window.__dashSearchKey = function(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.target.value = '';
+        window.__setDashSearch('');
+        return;
+    }
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const visible = Array.from(document.querySelectorAll('#dashboard .card[data-sid]:not(.dash-hidden)'));
+        if (visible.length === 1) visible[0].click();
+    }
+};
+
+window.__toggleStatusFilter = function(key) {
+    window.__statusFilter = (window.__statusFilter === key) ? null : key;
+    if (window.__statusFilter) window.__showDashboardIfFolded();
+    window.__renderPeriodSummary();
+    window.__applyDashboardFilter();
+};
+
+window.__clearDashFilter = function() {
+    window.__searchTerm = '';
+    window.__statusFilter = null;
+    const input = document.getElementById('dash-search');
+    if (input) input.value = '';
+    window.__renderPeriodSummary();
+    window.__applyDashboardFilter();
+};
+
+// =========================================================
 // 💡 [신규 기능] 현황판 자동 새로고침
 // - 교시가 바뀔 때, 그리고 각 교시 시작 10분 뒤(출결 입력 반영용)에 한 번씩 자동 갱신
 // - 날짜/교시를 직접 골라 과거·미래를 보는 중이면 갱신하지 않음
@@ -4362,6 +4505,7 @@ window.__autoRefreshTick = async function() {
     const alertContent = document.getElementById('smart-alert-content');
     const alertFolded = alertContent && alertContent.style.display === 'none';
     const scrollY = window.scrollY;
+    const searchFocused = document.activeElement && document.activeElement.id === 'dash-search';
 
     window.__autoRefreshing = true;
     try {
@@ -4375,6 +4519,10 @@ window.__autoRefreshTick = async function() {
         if (btn) { btn.innerText = '바둑판 펴기 ⬇'; btn.style.background = '#27ae60'; }
     }
     if (alertFolded) window.__toggleSmartAlert();
+    if (searchFocused) {
+        const input = document.getElementById('dash-search');
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }
     window.scrollTo(0, scrollY);
 };
 
