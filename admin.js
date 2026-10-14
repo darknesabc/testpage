@@ -259,31 +259,46 @@ window.__fetchAllAttendance = async function(studentId) {
 // =========================================================
 // 💡 [업그레이드] 최근 N일치 데이터 1000개 무제한 가져오기 (스마트 알림판용)
 // =========================================================
-window.__fetchRecentData = async function(tableName, dateCol, startDate) {
-    let allData = [];
-    let fetchMore = true;
-    let startIdx = 0;
-    
-    while (fetchMore) {
-        let query = _supabase.from(tableName).select('*').gte(dateCol, startDate).range(startIdx, startIdx + 999);
-        
-        // 출결 데이터는 꼬이지 않게 학생/교시 순으로 고정 정렬 + 날짜순 정렬 추가(누락 완벽 방지)
-if (tableName === 'attendance') {
-    query = query.order('student_id', { ascending: true }).order('period', { ascending: true }).order('attendance_date', { ascending: false });
-}
-        
-        const { data, error } = await query;
-        if (error) { console.error(`${tableName} 로드 에러:`, error); break; }
-        
-        if (data && data.length > 0) {
-            allData = allData.concat(data);
-            startIdx += 1000;
-            if (data.length < 1000) fetchMore = false;
-        } else {
-            fetchMore = false;
+// =========================================================
+// 💡 [속도 개선] 1000건 제한을 넘는 데이터를 "병렬"로 나눠 받는 공통 함수
+// - 첫 페이지에서 전체 건수를 확인한 뒤, 나머지 페이지를 최대 6개씩 동시에 요청
+// - makeQuery(): 매번 새 쿼리를 만들어 돌려주는 함수 (정렬이 고정돼 있어야 누락/중복이 없음)
+// =========================================================
+window.__fetchAllPages = async function(makeQuery, label) {
+    const PAGE = 1000, PARALLEL = 6;
+    const first = await makeQuery({ count: 'exact' }).range(0, PAGE - 1);
+    if (first.error) { console.error(`${label} 로드 에러:`, first.error); return { data: [], error: first.error }; }
+
+    let allData = first.data || [];
+    const total = (typeof first.count === 'number') ? first.count : allData.length;
+    if (allData.length < PAGE || total <= PAGE) return { data: allData };
+
+    const starts = [];
+    for (let s = PAGE; s < total; s += PAGE) starts.push(s);
+
+    for (let i = 0; i < starts.length; i += PARALLEL) {
+        const batch = starts.slice(i, i + PARALLEL);
+        const results = await Promise.all(batch.map(s => makeQuery().range(s, s + PAGE - 1)));
+        for (const r of results) {
+            if (r.error) { console.error(`${label} 로드 에러:`, r.error); return { data: allData, error: r.error }; }
+            allData = allData.concat(r.data || []);
         }
     }
     return { data: allData };
+};
+
+// 최근 N일치 데이터 가져오기 (스마트 알림판/현황판용)
+// endDate: 이 날짜까지만 (없으면 끝 제한 없음), columns: 필요한 칸만 (없으면 전체)
+window.__fetchRecentData = async function(tableName, dateCol, startDate, endDate, columns) {
+    return window.__fetchAllPages((opts) => {
+        let query = _supabase.from(tableName).select(columns || '*', opts).gte(dateCol, startDate);
+        if (endDate) query = query.lte(dateCol, endDate);
+        // 출결 데이터는 꼬이지 않게 학생/교시/날짜 순으로 고정 정렬(누락 방지)
+        if (tableName === 'attendance') {
+            query = query.order('student_id', { ascending: true }).order('period', { ascending: true }).order('attendance_date', { ascending: false });
+        }
+        return query;
+    }, tableName);
 };
 
 window.__fetchAllEduScores = async function() {
@@ -522,17 +537,23 @@ async function init() {
             </div>
         `;
 
-        let query = _supabase.from('student').select('*');
-        if (loggedInId === 'admin_4F') {
-            query = query.ilike('seat_no', '4-%'); 
-        }
-        else if (loggedInRole !== 'super') {
-            query = query.eq('teacher_name', loggedInManager);
-        }
+        // 💡 [버그 수정] 학생이 1000명을 넘으면 잘리던 문제 → 나눠 받기
+        const makeStudentQuery = (opts) => {
+            let query = _supabase.from('student').select('*', opts).order('student_id', { ascending: true });
+            if (loggedInId === 'admin_4F') {
+                query = query.ilike('seat_no', '4-%');
+            }
+            else if (loggedInRole !== 'super') {
+                query = query.eq('teacher_name', loggedInManager);
+            }
+            return query;
+        };
 
         const [resStudents, resAtt, resSleep, resMove, resEduRaw, resSurvey] = await Promise.all([
-            query,
-            window.__fetchRecentData('attendance', 'attendance_date', start7dIso),
+            window.__fetchAllPages(makeStudentQuery, 'student'),
+            // 💡 [속도 개선] 출결은 "지난 7일 ~ 조회일"까지만, 현황판에 쓰는 5칸만 받기
+            //    (조회일 이후 데이터는 아래 계산에서 원래도 버리고 있었음)
+            window.__fetchRecentData('attendance', 'attendance_date', start7dIso, today, 'student_id,attendance_date,period,status_code,memo'),
             window.__fetchRecentData('sleep_log', 'sleep_date', start7dIso),
             window.__fetchRecentData('move_log', 'move_date', start7dIso),
             window.__fetchAllEduScores(),
@@ -591,12 +612,23 @@ async function init() {
             }
         };
 
+        // 💡 [속도 개선] 학생마다 전체 배열을 뒤지지 않도록 학번별로 미리 묶어둠 (순서는 그대로 유지)
+        const groupById = (arr) => {
+            const m = new Map();
+            (arr || []).forEach(x => { const k = x.student_id; if (!m.has(k)) m.set(k, []); m.get(k).push(x); });
+            return m;
+        };
+        const attById = groupById(resAtt.data), sleepById = groupById(resSleep.data), moveById = groupById(resMove.data);
+        const surveyById = groupById(resSurvey.data), eduById = groupById(processedEduData);
+
+        const cardsHtml = []; // 💡 [속도 개선] 카드를 모았다가 마지막에 한 번만 그림
+
         students.forEach(s => {
-            const stAtts7d = resAtt.data.filter(a => a.student_id === s.student_id);
-            const stSleep7d = resSleep.data.filter(sl => sl.student_id === s.student_id);
-            const stMove7d = window.__processMoveLogs(resMove.data.filter(ml => ml.student_id === s.student_id));
-            const stSurvey7d = resSurvey.data.filter(sv => sv.student_id === s.student_id);
-            const stEduAll = processedEduData.filter(el => el.student_id === s.student_id);
+            const stAtts7d = attById.get(s.student_id) || [];
+            const stSleep7d = sleepById.get(s.student_id) || [];
+            const stMove7d = window.__processMoveLogs(moveById.get(s.student_id) || []);
+            const stSurvey7d = surveyById.get(s.student_id) || [];
+            const stEduAll = eduById.get(s.student_id) || [];
 
             const stAttsToday = stAtts7d.filter(a => a.attendance_date === today);
             const att = stAttsToday.find(a => String(a.period) === String(currentP));
@@ -786,7 +818,7 @@ else {
                 teacherIdx++; // 새로운 반이 나올 때마다 번호 1 증가
                 const tCount = students.filter(x => (x.teacher_name || '미배정') === window.__currentTeacherLabel).length;
                 
-                dashboard.innerHTML += `
+                cardsHtml.push(`
                     <div onclick="window.__toggleTeacherGroup('teacher-group-${teacherIdx}')" style="grid-column: 1 / -1; cursor:pointer; background:#34495e; color:#fff; padding:8px 15px; border-radius:8px; font-weight:bold; font-size:14px; margin-top:15px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 4px rgba(0,0,0,0.1); transition:0.2s;" onmouseover="this.style.background='#2c3e50'" onmouseout="this.style.background='#34495e'">
                         <span style="display:flex; align-items:center; gap:8px;">
                             👨‍🏫 ${window.__currentTeacherLabel} 선생님 반 
@@ -797,13 +829,13 @@ else {
                             <span id="icon-teacher-group-${teacherIdx}" style="font-size:12px; transition:transform 0.3s; transform:rotate(0deg);">▼</span>
                         </div>
                     </div>
-                `;
+                `);
             }
 
             // 💡 [신규] 카드 껍데기에 반별 고유 클래스(teacher-group-번호)를 붙여줍니다.
             const groupClass = window.__currentSortMode === 'teacher' ? `teacher-group-${teacherIdx}` : '';
             
-            dashboard.innerHTML += `
+            cardsHtml.push(`
                 <div class="card status-${color} ${groupClass}" style="position:relative; cursor:pointer; transition: opacity 0.2s, transform 0.2s;" onclick="window.__loadStudentDetail(window.__dashboardItems.find(x => x.studentId === '${s.student_id}'))">
                     <div class="seat" style="font-size:11px; opacity:0.7;">${s.seat_no}</div>
                     <div class="name" style="font-size:18px; margin: 5px 0;">${s.name}</div>
@@ -819,8 +851,10 @@ else {
                         ${eduBadge}
                     </div>
                 </div>
-            `;
+            `);
         });
+
+        dashboard.innerHTML = cardsHtml.join(''); // 💡 [속도 개선] 바둑판을 한 번에 그림
 
         // 🚨 알림판 UI 렌더러 (이름 클릭 🔗 연동)
         const buildAlertRow = (title, icon, items, color, bgColor) => {
