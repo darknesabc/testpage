@@ -88,7 +88,7 @@ const KOR_UNIT_ORDER = {
 };
 
 const EDU_SCORE_MAP = {
-    "전자기기 부정사용": 10, "핸드폰 무단사용": 7, "해드폰 미제출": 7, "무단결석": 7, "무단이탈": 7,
+    "전자기기 부정사용": 10, "핸드폰 무단사용": 7, "핸드폰 미제출": 7, "무단결석": 7, "무단이탈": 7,
     "타층/타관 무단출입": 5, "원내대화": 5, "무단지각": 5, "모의고사 무단 1회 미응시": 5,
     "취침강제하원(7회)": 3, "음식물섭취": 3, "입/퇴실 미준수": 3,
     "지각": 1, "자습 중 이동 태블릿 미입력": 1, "취침": 1
@@ -338,13 +338,16 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// 💡 교시 시간표 (현재 교시 계산 + 자동 새로고침에서 함께 사용)
+const PERIOD_SCHEDULE = [
+    { p: "1", start: "08:00", end: "08:30" }, { p: "2", start: "08:50", end: "10:10" },
+    { p: "3", start: "10:30", end: "12:10" }, { p: "4", start: "13:20", end: "14:30" },
+    { p: "5", start: "14:50", end: "15:50" }, { p: "6", start: "16:10", end: "17:30" },
+    { p: "7", start: "18:40", end: "20:10" }, { p: "8", start: "20:30", end: "22:00" }
+];
+
 function getCurrentPeriod() {
-    const SCHEDULE = [
-        { p: "1", start: "08:00", end: "08:30" }, { p: "2", start: "08:50", end: "10:10" },
-        { p: "3", start: "10:30", end: "12:10" }, { p: "4", start: "13:20", end: "14:30" },
-        { p: "5", start: "14:50", end: "15:50" }, { p: "6", start: "16:10", end: "17:30" },
-        { p: "7", start: "18:40", end: "20:10" }, { p: "8", start: "20:30", end: "22:00" }
-    ];
+    const SCHEDULE = PERIOD_SCHEDULE;
     const now = new Date();
     const currentTime = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
 
@@ -360,7 +363,7 @@ function getCurrentPeriod() {
 window.__getPeriodFromTime = function(timeStr) {
     if (!timeStr) return 1;
     const [h, m] = timeStr.split(':').map(Number); const t = h * 60 + m;
-    if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60) return 3;
+    if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60+10) return 3;
     if (t < 14*60+30) return 4; if (t < 15*60+50) return 5; if (t < 17*60+30) return 6;
     if (t < 20*60+10) return 7; return 8;
 };
@@ -1020,7 +1023,7 @@ window.__loadStudentDetail = async function(student) {
         const getPeriodFromTime = (timeStr) => {
             if (!timeStr) return 1;
             const [h, m] = timeStr.split(':').map(Number); const t = h * 60 + m;
-            if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60) return 3;
+            if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60+10) return 3;
             if (t < 14*60+30) return 4; if (t < 15*60+50) return 5; if (t < 17*60+30) return 6;
             if (t < 20*60+10) return 7; return 8;
         };
@@ -3384,7 +3387,7 @@ window.__openDetailModal = async function(type, studentId, studentName) {
                 if (timeType.includes("결석")) { startP = 1; endP = 8; } else if (timeType.includes("오전")) { startP = 1; endP = 3; } else if (timeType.includes("오후")) { startP = 1; endP = 6; } else if (timeType.includes("야간") || timeType.includes("저녁")) { startP = 1; endP = 7; }
                 if (startP > 0) { if (!schedMap[dStr]) schedMap[dStr] = {}; for(let p=startP; p<=endP; p++) schedMap[dStr][p] = `[설문] ${reason}`; }
             });
-            const getPeriodFromTime = (timeStr) => { if (!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number); const t = h * 60 + m; if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60) return 3; if (t < 14*60+30) return 4; if (t < 15*60+50) return 5; if (t < 17*60+30) return 6; if (t < 20*60+10) return 7; return 8; };
+            const getPeriodFromTime = (timeStr) => { if (!timeStr) return 0; const [h, m] = timeStr.split(':').map(Number); const t = h * 60 + m; if (t < 8*60+30) return 1; if (t < 10*60+10) return 2; if (t < 12*60+10) return 3; if (t < 14*60+30) return 4; if (t < 15*60+50) return 5; if (t < 17*60+30) return 6; if (t < 20*60+10) return 7; return 8; };
             const processedModalMoveData = window.__processMoveLogs(moveData);
 processedModalMoveData.forEach(mv => { 
     if (mv.reason === "화장실/정수기") return; 
@@ -4317,5 +4320,65 @@ window.__renderSusiTable = function(grades) {
 
     container.innerHTML = `<div style="padding:10px; max-width:1200px; margin:0 auto; background:#f4f6f7; border-radius:8px;">${cardsHtml}</div>`;
 };
+
+// =========================================================
+// 💡 [신규 기능] 현황판 자동 새로고침
+// - 교시가 바뀔 때, 그리고 각 교시 시작 10분 뒤(출결 입력 반영용)에 한 번씩 자동 갱신
+// - 날짜/교시를 직접 골라 과거·미래를 보는 중이면 갱신하지 않음
+// - 접어둔 바둑판/알림판 상태와 스크롤 위치는 그대로 유지
+// =========================================================
+const AUTO_REFRESH_AFTER_START_MIN = 10;
+
+window.__autoRefreshKey = function() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const hhmm = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const p = getCurrentPeriod();
+    const sched = PERIOD_SCHEDULE.find(x => x.p === p);
+    let settled = 0;
+    if (sched) {
+        const [h, m] = sched.start.split(':').map(Number);
+        const t = h * 60 + m + AUTO_REFRESH_AFTER_START_MIN;
+        settled = hhmm >= `${pad(Math.floor(t / 60))}:${pad(t % 60)}` ? 1 : 0;
+    }
+    return `${today}|${p}|${settled}`;
+};
+
+window.__lastAutoRefreshKey = window.__autoRefreshKey();
+window.__autoRefreshing = false;
+
+window.__autoRefreshTick = async function() {
+    if (!loggedInManager || window.__autoRefreshing) return;
+    if (window.__viewDate || window.__viewPeriod) return; // 타임머신 조회 중
+    if (document.hidden) return;                          // 탭이 안 보이면 다시 보일 때 갱신
+
+    const key = window.__autoRefreshKey();
+    if (key === window.__lastAutoRefreshKey) return;
+    window.__lastAutoRefreshKey = key;
+
+    const dash = document.getElementById('dashboard');
+    const dashFolded = dash && dash.style.display === 'none';
+    const alertContent = document.getElementById('smart-alert-content');
+    const alertFolded = alertContent && alertContent.style.display === 'none';
+    const scrollY = window.scrollY;
+
+    window.__autoRefreshing = true;
+    try {
+        await init();
+    } finally {
+        window.__autoRefreshing = false;
+    }
+
+    if (dashFolded) {
+        const btn = document.getElementById('dashboard-fold-btn');
+        if (btn) { btn.innerText = '바둑판 펴기 ⬇'; btn.style.background = '#27ae60'; }
+    }
+    if (alertFolded) window.__toggleSmartAlert();
+    window.scrollTo(0, scrollY);
+};
+
+setInterval(window.__autoRefreshTick, 30 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) window.__autoRefreshTick(); });
 
 init();
