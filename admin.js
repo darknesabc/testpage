@@ -1448,22 +1448,11 @@ window.__openUnivSimulation = async function() {
     };
 
     try {
-        let cutoffs = [];
-        let fetchMore = true; 
-        let startIdx = 0;
-        
-        while(fetchMore) {
-            const { data, error } = await _supabase.from('univ_cutoffs').select('*').range(startIdx, startIdx + 999);
-            if (error) throw new Error("배치표 DB 로드 실패: " + error.message);
-            
-            if (data && data.length > 0) { 
-                cutoffs = cutoffs.concat(data); 
-                startIdx += 1000; 
-                if(data.length < 1000) fetchMore = false; 
-            } else {
-                fetchMore = false;
-            }
-        }
+        // 💡 [속도 개선] 배치표는 10분간 기억 + 정렬 고정해서 병렬로 받기
+        const cutRes = await window.__cachedFetch(window.__mockCache.cutoffs, 'all', () =>
+            window.__fetchAllPages(opts => _supabase.from('univ_cutoffs').select('*', opts).order('id', { ascending: true }), 'univ_cutoffs'));
+        if (cutRes.error) throw new Error("배치표 DB 로드 실패: " + cutRes.error.message);
+        const cutoffs = cutRes.data || [];
 
         if (cutoffs.length === 0) throw new Error("DB에 배치표 데이터가 존재하지 않습니다.");
 
@@ -2038,37 +2027,46 @@ window.__loadGradeErrata = async function(examLabel) {
         let allMyErrata = [];
         let allQInfos = [];
         let currentExamAllErrata = [];
+        let currentExamStatsRows = null;
 
         // window.__loadGradeErrata 내부의 fetchExamData 함수만 이 코드로 교체하세요
 const fetchExamData = async (ex) => {
-    // 1. 정오표(Errata) 가져오기
-    // 💡 [버그 수정] 정렬 기준을 고정해서 나눠 받을 때 중복/누락이 없게 + 시험별로 10분간 캐시
-    const errRes = await window.__cachedFetch(window.__mockCache.errata, ex, () =>
-        window.__fetchAllPages(opts => _supabase.from('mock_errata').select('*', opts).eq('exam_label', ex)
-            .order('student_id', { ascending: true }).order('period', { ascending: true })
-            .order('subject', { ascending: true }).order('seat_no', { ascending: true }), 'mock_errata'));
-    const allExErrata = errRes.data || [];
-    
-    const studentExErrata = allExErrata.filter(e => String(e.student_id || "").trim() === studentId || Object.values(e).some(val => String(val).trim() === studentId));
+    // 💡 [속도 개선] 전체 정오표 대신
+    //   - 문항별 정답 인원/응시 인원은 DB 함수(mock_errata_stats)로 계산해서 받고
+    //   - 학생 본인 정오표만 따로 받음
+    //   DB 함수가 없거나 실패하면 예전처럼 전체 정오표를 받아 계산 (화면 결과는 동일)
+    const needStats = (ex === examLabel);
+    const [mineRes, qRes, statsRes] = await Promise.all([
+        window.__getMyErrata(ex, studentId),
+        window.__getQInfo(ex),
+        needStats ? window.__getExamStats(ex) : Promise.resolve(null)
+    ]);
+    const qInfos = (qRes && qRes.data) || [];
+    let studentExErrata = (mineRes && !mineRes.error && mineRes.data) || [];
+    let statsRows = null, allExErrata = null;
 
-    // 2. 문항 정보(Question Info) 가져오기 (정렬 고정 + 캐시)
-    const qRes = await window.__cachedFetch(window.__mockCache.qinfo, ex, () =>
-        window.__fetchAllPages(opts => _supabase.from('mock_question_info').select('*', opts).eq('exam_label', ex)
-            .order('subject', { ascending: true }).order('question_num', { ascending: true }), 'mock_question_info'));
-    const qInfos = qRes.data || [];
+    const statsOk = statsRes && !statsRes.error && Array.isArray(statsRes.data);
+    if (statsOk) { statsRows = statsRes.data; window.__statsRpcOk = true; }
 
-    return { ex, allExErrata, studentExErrata, qInfos };
+    if ((needStats && !statsOk) || (mineRes && mineRes.error)) {
+        const errRes = await window.__getAllErrata(ex);
+        allExErrata = errRes.data || [];
+        studentExErrata = allExErrata.filter(e => String(e.student_id || "").trim() === studentId || Object.values(e).some(val => String(val).trim() === studentId));
+    }
+
+    return { ex, allExErrata, statsRows, studentExErrata, qInfos };
 };
 
         const results = await Promise.all(targetExams.map(ex => fetchExamData(ex)));
         if (isStale()) return;
+        setTimeout(() => window.__prefetchOtherExams(studentId, examLabel, mySeq), 300); // 💡 다른 시험 미리 받기
         results.forEach(res => {
-            if (res.ex === examLabel) currentExamAllErrata = res.allExErrata;
+            if (res.ex === examLabel) { currentExamAllErrata = res.allExErrata || []; currentExamStatsRows = res.statsRows; }
             allMyErrata = allMyErrata.concat(res.studentExErrata);
             allQInfos = allQInfos.concat(res.qInfos);
         });
 
-        if (currentExamAllErrata.length === 0) {
+        if ((currentExamStatsRows ? currentExamStatsRows.length : currentExamAllErrata.length) === 0) {
             container.innerHTML = '<div style="text-align:center; padding:30px; color:#e74c3c;">DB에서 데이터를 가져오지 못했습니다.</div>';
             return;
         }
@@ -2127,12 +2125,31 @@ const fetchExamData = async (ex) => {
             }
         };
 
-        currentExamAllErrata.forEach(row => {
-            const normSubj = normalizeSubj(row.subject);
-            addToStats(normSubj, row);
-            if (['화법과작문', '언어와매체', '국어'].includes(normSubj)) addToStats('국어공통', row);
-            if (['미적분', '기하', '확률과통계', '수학', '수학1', '수학2'].includes(normSubj)) addToStats('수학공통', row);
-        });
+        if (currentExamStatsRows) {
+            // 💡 DB에서 계산해 온 문항별 집계를 같은 형태(stats[과목][문항] = {o, total})로 합산
+            const addCount = (targetKey, r) => {
+                if (!stats[targetKey]) stats[targetKey] = {};
+                const qn = Number(r.q);
+                if (qn > 0) {
+                    if (!stats[targetKey][qn]) stats[targetKey][qn] = { o: 0, total: 0 };
+                    stats[targetKey][qn].o += Number(r.o_count) || 0;
+                    stats[targetKey][qn].total += Number(r.total) || 0;
+                }
+            };
+            currentExamStatsRows.forEach(r => {
+                const normSubj = normalizeSubj(r.subject);
+                addCount(normSubj, r);
+                if (['화법과작문', '언어와매체', '국어'].includes(normSubj)) addCount('국어공통', r);
+                if (['미적분', '기하', '확률과통계', '수학', '수학1', '수학2'].includes(normSubj)) addCount('수학공통', r);
+            });
+        } else {
+            currentExamAllErrata.forEach(row => {
+                const normSubj = normalizeSubj(row.subject);
+                addToStats(normSubj, row);
+                if (['화법과작문', '언어와매체', '국어'].includes(normSubj)) addToStats('국어공통', row);
+                if (['미적분', '기하', '확률과통계', '수학', '수학1', '수학2'].includes(normSubj)) addToStats('수학공통', row);
+            });
+        }
 
         const qInfoMap = {}; 
         const qInfoRawMap = {}; 
@@ -4340,7 +4357,40 @@ window.__renderSusiTable = function(grades) {
 window.__detailSeq = 0;
 window.__errataSeq = 0;
 const MOCK_CACHE_MS = 10 * 60 * 1000;
-window.__mockCache = { scores: {}, errata: {}, qinfo: {}, unitMap: {} };
+window.__mockCache = { scores: {}, errata: {}, qinfo: {}, unitMap: {}, stats: {}, mine: {}, cutoffs: {} };
+window.__statsRpcOk = false;
+
+// 시험별 문항 정답 집계 (DB 함수) - 과목, 문항, 정답 인원, 응시 인원
+window.__getExamStats = (ex) => window.__cachedFetch(window.__mockCache.stats, ex, () =>
+    _supabase.rpc('mock_errata_stats', { p_exam: ex }).then(r => r));
+
+// 학생 본인 정오표만
+window.__getMyErrata = (ex, sid) => window.__cachedFetch(window.__mockCache.mine, ex + '|' + sid, () =>
+    window.__fetchAllPages(opts => _supabase.from('mock_errata').select('*', opts).eq('exam_label', ex).eq('student_id', sid)
+        .order('period', { ascending: true }).order('subject', { ascending: true }).order('seat_no', { ascending: true }), 'mock_errata(본인)'));
+
+// 예전 방식: 시험 전체 정오표 (DB 함수가 없을 때만 사용)
+window.__getAllErrata = (ex) => window.__cachedFetch(window.__mockCache.errata, ex, () =>
+    window.__fetchAllPages(opts => _supabase.from('mock_errata').select('*', opts).eq('exam_label', ex)
+        .order('student_id', { ascending: true }).order('period', { ascending: true })
+        .order('subject', { ascending: true }).order('seat_no', { ascending: true }), 'mock_errata'));
+
+// 문항 정보
+window.__getQInfo = (ex) => window.__cachedFetch(window.__mockCache.qinfo, ex, () =>
+    window.__fetchAllPages(opts => _supabase.from('mock_question_info').select('*', opts).eq('exam_label', ex)
+        .order('subject', { ascending: true }).order('question_num', { ascending: true }), 'mock_question_info'));
+
+// 💡 학생의 다른 시험 데이터를 뒤에서 하나씩 미리 받아둠 (DB 함수가 있을 때만, 학생을 바꾸면 중단)
+window.__prefetchOtherExams = async function(sid, currentExam, seq) {
+    if (!window.__statsRpcOk) return;
+    const exams = (window.__currentStudentScores || []).map(s => s.exam_label).filter(ex => ex && ex !== currentExam);
+    for (const ex of exams.reverse()) { // 최근 시험부터
+        if (seq !== window.__detailSeq) return;
+        try {
+            await Promise.all([window.__getExamStats(ex), window.__getMyErrata(ex, sid), window.__getQInfo(ex)]);
+        } catch (e) { return; }
+    }
+};
 
 window.__cachedFetch = function(store, key, loader) {
     const now = Date.now();
