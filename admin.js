@@ -293,6 +293,21 @@ window.__fetchAllPages = async function(makeQuery, label) {
     return { data: allData };
 };
 
+// 💡 [버그 예방] 학생 한 명의 기록 전체 (1,000건이 넘어도 빠짐없이, 순서 고정)
+const STUDENT_ROW_ORDER = {
+    move_log:      [['move_date', false], ['move_time', false], ['id', true]],
+    edu_score_log: [['score_date', false], ['score_time', false], ['id', true]],
+    sleep_log:     [['sleep_date', false], ['period', true]],
+    survey_log:    [['survey_date', false], ['survey_time', false], ['id', true]]
+};
+window.__fetchStudentRows = function(tableName, studentId) {
+    return window.__fetchAllPages((opts) => {
+        let q = _supabase.from(tableName).select('*', opts).eq('student_id', studentId);
+        (STUDENT_ROW_ORDER[tableName] || []).forEach(([col, asc]) => { q = q.order(col, { ascending: asc }); });
+        return q;
+    }, tableName);
+};
+
 // 최근 N일치 데이터 가져오기 (스마트 알림판/현황판용)
 // endDate: 이 날짜까지만 (없으면 끝 제한 없음), columns: 필요한 칸만 (없으면 전체)
 window.__fetchRecentData = async function(tableName, dateCol, startDate, endDate, columns) {
@@ -302,6 +317,11 @@ window.__fetchRecentData = async function(tableName, dateCol, startDate, endDate
         // 출결 데이터는 꼬이지 않게 학생/교시/날짜 순으로 고정 정렬(누락 방지)
         if (tableName === 'attendance') {
             query = query.order('student_id', { ascending: true }).order('period', { ascending: true }).order('attendance_date', { ascending: false });
+        } else if (tableName === 'sleep_log') {
+            // 💡 [버그 수정] 1,000건이 넘을 때 중복/누락이 없도록 순서 고정
+            query = query.order('sleep_date', { ascending: false }).order('student_id', { ascending: true }).order('period', { ascending: true });
+        } else if (tableName === 'move_log' || tableName === 'survey_log') {
+            query = query.order('id', { ascending: true });
         }
         return query;
     }, tableName);
@@ -1019,11 +1039,11 @@ window.__loadStudentDetail = async function(student) {
     try {
         // 💡 1. resEdu -> resEduRaw 로 이름 변경
         const [resMove, resEduRaw, resSleep, resAtt, resSurvey] = await Promise.all([
-            _supabase.from('move_log').select('*').eq('student_id', student.studentId).order('move_date', {ascending: false}).order('move_time', {ascending: false}),
-            _supabase.from('edu_score_log').select('*').eq('student_id', student.studentId).order('score_date', {ascending: false}),
-            _supabase.from('sleep_log').select('*').eq('student_id', student.studentId).order('sleep_date', {ascending: false}),
+            window.__fetchStudentRows('move_log', student.studentId),
+            window.__fetchStudentRows('edu_score_log', student.studentId),
+            window.__fetchStudentRows('sleep_log', student.studentId),
             window.__fetchAllAttendance(student.studentId), // 1000개 무제한 함수
-            _supabase.from('survey_log').select('*').eq('student_id', student.studentId)
+            window.__fetchStudentRows('survey_log', student.studentId)
         ]);
         if (mySeq !== window.__detailSeq) return; // 그사이 다른 학생을 열었으면 그리지 않음
 
@@ -3407,9 +3427,9 @@ window.__openDetailModal = async function(type, studentId, studentName) {
         if (type === 'attendance') {
             const [resAtt, resMove, resSurvey, resEdu] = await Promise.all([ 
                 window.__fetchAllAttendance(studentId), // 👈 1000개 무제한 함수로 교체
-                _supabase.from('move_log').select('*').eq('student_id', studentId), 
-                _supabase.from('survey_log').select('*').eq('student_id', studentId), 
-                _supabase.from('edu_score_log').select('*').eq('student_id', studentId) 
+                window.__fetchStudentRows('move_log', studentId),
+                window.__fetchStudentRows('survey_log', studentId),
+                window.__fetchStudentRows('edu_score_log', studentId)
             ]);
             const data = resAtt.data || []; const moveData = resMove.data || []; const surveyData = resSurvey.data || []; const eduData = resEdu.data || [];
             if (!data || data.length === 0) { contentArea.innerHTML = '<div style="text-align:center; padding:30px; color:#7f8c8d;">기록이 없습니다.</div>'; return; }
@@ -3562,7 +3582,7 @@ if (memo === '취소') { memo = '-'; }
         } 
         else {
             window.__modalData = { type: type, items: [] }; let tableQuery = null;
-            if (type === 'move') { tableQuery = _supabase.from('move_log').select('*').eq('student_id', studentId).order('move_date', {ascending: false}).order('move_time', {ascending: false}); } else if (type === 'sleep') { tableQuery = _supabase.from('sleep_log').select('*').eq('student_id', studentId).order('sleep_date', {ascending: false}); } else if (type === 'eduscore') { tableQuery = _supabase.from('edu_score_log').select('*').eq('student_id', studentId).order('score_date', {ascending: false}); }
+            if (type === 'move') { tableQuery = window.__fetchStudentRows('move_log', studentId); } else if (type === 'sleep') { tableQuery = window.__fetchStudentRows('sleep_log', studentId); } else if (type === 'eduscore') { tableQuery = window.__fetchStudentRows('edu_score_log', studentId); }
             
             const { data } = await tableQuery; 
             // 💡 [변경] 교육점수일 경우 전처리 함수 통과
