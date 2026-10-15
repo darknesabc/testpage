@@ -223,7 +223,12 @@ async function handleLogin() {
     }
 }
 
-function handleLogout() { localStorage.clear(); location.reload(); }
+async function handleLogout() {
+    // 💡 [보안] 서버 쪽 로그인 세션도 끊고 나서 브라우저 저장소 정리
+    try { await _supabase.auth.signOut({ scope: 'local' }); } catch (e) { console.warn('로그아웃 처리 중 오류(무시):', e); }
+    localStorage.clear();
+    location.reload();
+}
 
 // =========================================================
 // 💡 [추가 기능] 출결 데이터 1000개 제한 해제 헬퍼 함수
@@ -239,6 +244,7 @@ window.__fetchAllAttendance = async function(studentId) {
             .select('*')
             .eq('student_id', studentId)
             .order('attendance_date', { ascending: false })
+            .order('period', { ascending: true }) // 💡 [버그 수정] 같은 날짜 안에서도 순서 고정 → 나눠 받을 때 중복/누락 방지
             .range(startIdx, startIdx + 999);
 
         if (error) throw error;
@@ -312,6 +318,7 @@ window.__fetchAllEduScores = async function() {
             // 🚨 [필수 추가] 누락 방지용 정렬 기준
             .order('score_date', { ascending: false })
             .order('score_time', { ascending: false })
+            .order('id', { ascending: true }) // 💡 [버그 수정] 같은 날짜·시간끼리도 순서 고정
             .range(startIdx, startIdx + 999);
         if (error) break;
         if (data && data.length > 0) {
@@ -3774,7 +3781,7 @@ window.__openSusiSimulation = async function() {
         let allData = []; let fetchMore = true; let startIdx = 0;
         try {
             while (fetchMore) {
-                const { data, error } = await _supabase.from('susi_master_all').select('*').range(startIdx, startIdx + 999);
+                const { data, error } = await _supabase.from('susi_master_all').select('*').order('id', { ascending: true }).range(startIdx, startIdx + 999); // 💡 [버그 수정] 정렬 고정
                 if (error) throw error;
                 if (data && data.length > 0) {
                     allData = allData.concat(data); startIdx += 1000;
